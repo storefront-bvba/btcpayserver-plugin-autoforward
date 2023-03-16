@@ -16,24 +16,24 @@
     <h2 class="mb-0">
         @ViewData["Title"]
     </h2>
-    
+
     @* 
     TODO add support to manually create an auto-forwardable invoice?
     <a id="CreateNewInvoice" asp-action="CreateInvoice" asp-route-storeId="@Model.StoreId" asp-route-searchTerm="@Model.SearchTerm" class="btn btn-primary mt-3 mt-sm-0"> *@
     @*     <span class="fa fa-plus"></span> *@
     @*     Create Invoice *@
     @* </a> *@
-    
+
 </div>
 
 <p>This page shows all invoices that have auto-forwarding enabled. For an invoice to be "auto-forwardable", they need to have these 2 metadata fields:</p>
 <ul>
     <li>
-        <strong>AutoForwardToAddress</strong>
+        <strong>autoForwardToAddress</strong>
         Contains a valid destination where to forward the funds to
     </li>
     <li>
-        <strong>AutoForwardPercentage</strong>
+        <strong>autoForwardPercentage</strong>
         Contains the percentage to auto-forward written as a number between 0 and 1
     </li>
 </ul>
@@ -41,62 +41,45 @@
 
 <h2>Invoices</h2>
 <div class="table-responsive">
-<table id="invoices" class="table table-hover">
-    <thead>
-    <tr>
-        <th>Date</th>
-        <th class="text-nowrap">Invoice ID</th>
-        <th class="text-nowrap">Order ID</th>
-        <th class="text-nowrap">Forward to</th>
-        <th class="text-nowrap text-end">Percentage to forward</th>
-        <th class="text-nowrap">Invoice Status</th>
-        <th class="text-nowrap text-end">Amount invoiced</th>
-        <th class="text-nowrap text-end">Amount received</th>
-        <th class="text-nowrap text-end">Amount forwarded</th>
-        <th class="text-nowrap">Forwarding Status</th>
-    </tr>
-    </thead>
-    <tbody>
-    @foreach (var invoice in Model.Invoices)
-    {
-        <tr id="invoice_@invoice.InvoiceId" class="invoice-row">
-            <td>@invoice.Date.ToBrowserDate()</td>
-            <td class="text-break">
-                            <a asp-controller="UIInvoice" asp-action="Invoice" class="invoice-details-link" asp-route-invoiceId="@invoice.InvoiceId">
-                                @invoice.InvoiceId
-                            </a>
-                        </td>
-            <td>
-                @if (invoice.RedirectUrl != string.Empty)
-                {
-                    <a href="@invoice.RedirectUrl" class="wraptextAuto" rel="noreferrer noopener">@invoice.OrderId</a>
-                }
-                else
-                {
+    <table id="invoices" class="table table-hover">
+        <thead>
+        <tr>
+            <th>Date</th>
+            <th class="text-nowrap">Invoice ID</th>
+            <th class="text-nowrap">Order ID</th>
+            <th class="text-nowrap">Forward to</th>
+            <th class="text-nowrap text-end">Percentage to forward</th>
+            <th class="text-nowrap">Invoice Status</th>
+            <th class="text-nowrap text-end">Amount invoiced</th>
+            <th class="text-nowrap text-end">Amount received</th>
+            <th class="text-nowrap text-end">Amount forwarded</th>
+            <th class="text-nowrap">Forwarding Status</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var invoice in Model.Invoices)
+        {
+            <tr id="invoice_@invoice.InvoiceId" class="invoice-row">
+                <td>@invoice.Date.ToBrowserDate()</td>
+                <td class="text-break">
+                    <a asp-controller="UIInvoice" asp-action="Invoice" class="invoice-details-link" asp-route-invoiceId="@invoice.InvoiceId">
+                        @invoice.InvoiceId
+                    </a>
+                </td>
+                <td>
                     <span class="wraptextAuto">@invoice.OrderId</span>
-                }
-            </td>
-            
-            
-            <!-- Forward to -->
-            <td></td>
-            
-            <!-- Percentage -->
-            <td></td>
+                </td>
 
-            <td>
-                @if (invoice.Details.Archived)
-                {
-                    <span class="badge bg-warning">archived</span>
-                }
-                @if (invoice.CanMarkStatus)
-                {
-                    <span class="dropdown-toggle changeInvoiceStateToggle" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        @invoice.Status.ToString()
-                    </span>
-                }
-                else
-                {
+
+                <td>
+                    @invoice.AutoForwardToAddress
+                </td>
+
+                <td class="text-end">
+                    @invoice.AutoForwardPercentage
+                </td>
+
+                <td>
                     <span class="badge badge-@invoice.Status.Status.ToModernStatus().ToString().ToLower()">
                         @invoice.Status.Status.ToModernStatus().ToString()
                         @if (invoice.Status.ExceptionStatus != InvoiceExceptionStatus.None)
@@ -104,41 +87,45 @@
                             @($"({invoice.Status.ExceptionStatus.ToString()})")
                         }
                     </span>
-                }
-                @foreach (var paymentType in invoice.Details.Payments.Select(payment => payment.GetPaymentMethodId()?.PaymentType).Distinct().Where(type => type != null && !string.IsNullOrEmpty(type.GetBadge())))
-                {
-                    <span class="badge">@paymentType.GetBadge()</span>
-                }
-                @if (invoice.HasRefund)
-                {
-                    <span class="badge bg-warning">Refund</span>
-                }
-            </td>
-            
-            
-            <td class="text-end text-nowrap">@DisplayFormatter.Currency(invoice.Amount, invoice.Currency)</td>
-            
-            <!-- Amount received -->
-            <td></td>
-            
-            <!-- Amount forwarded -->
-            <td></td>
-            
-            <!-- Forwarding status -->
-            <td></td>
-            
-            <td></td>
-            <td></td>
-            <td></td>
-            <td></td>
-        </tr>
-    }
-    </tbody>
-</table>
+
+                    @foreach (var paymentType in invoice.Payments.Select(payment => payment.GetPaymentMethodId()?.PaymentType).Distinct().Where(type => type != null && !string.IsNullOrEmpty(type.GetBadge())))
+                    {
+                        <span class="badge">@paymentType.GetBadge()</span>
+                    }
+                    @if (invoice.HasRefund)
+                    {
+                        <span class="badge bg-warning">Refund</span>
+                    }
+                </td>
+
+
+                <td class="text-end text-nowrap">@DisplayFormatter.Currency(invoice.Amount, invoice.Currency)</td>
+
+                <td class="text-end">
+                    @invoice.AmountReceived
+                </td>
+
+                <!-- Amount forwarded -->
+                <td class="text-end">
+
+                </td>
+
+                <!-- Forwarding status -->
+                <td>
+
+                </td>
+
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+            </tr>
+        }
+        </tbody>
+    </table>
 </div>
 
 <vc:pager view-model="Model"/>
-
 
 
 @* <h2>Totals</h2> *@

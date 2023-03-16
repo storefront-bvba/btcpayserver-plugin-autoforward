@@ -14,10 +14,17 @@ public class AutoForwardInvoiceMetadata: InvoiceMetadata
     }
     
     [JsonIgnore]
-    public string AutoForwardTo
+    public string AutoForwardToAddress
     {
-        get => this.GetAdditionalData<string>("autoForwardTo");
-        set => this.SetAdditionalData("autoForwardTo", value);
+        get => this.GetAdditionalData<string>("autoForwardToAddress");
+        set => this.SetAdditionalData("autoForwardToAddress", value);
+    }
+    
+    [JsonIgnore]
+    public decimal AutoForwardPercentage
+    {
+        get => this.GetAdditionalData<decimal>("autoForwardPercentage");
+        set => this.SetAdditionalData("autoForwardPercentage", value);
     }
     
     public static AutoForwardInvoiceMetadata FromJObject(JObject jObject)
