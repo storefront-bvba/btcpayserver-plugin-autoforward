@@ -1,6 +1,7 @@
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Models;
 using BTCPayServer.Abstractions.Services;
+using BTCPayServer.Plugins.AutoForward.Services;
 using BTCPayServer.Plugins.Template.Services;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -20,6 +21,7 @@ public class Plugin : BaseBTCPayServerPlugin
         services.AddHostedService<PluginMigrationRunner>();
         services.AddSingleton<MyPluginService>();
         services.AddSingleton<MyPluginDbContextFactory>();
+        services.AddHostedService<InvoiceWatcher>();
         services.AddDbContext<MyPluginDbContext>((provider, o) =>
         {
             MyPluginDbContextFactory factory = provider.GetRequiredService<MyPluginDbContextFactory>();

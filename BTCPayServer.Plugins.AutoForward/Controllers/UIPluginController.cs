@@ -8,10 +8,12 @@ using BTCPayServer.Models;
 using BTCPayServer.Models.InvoicingModels;
 using BTCPayServer.Plugins.Template.Data;
 using BTCPayServer.Plugins.Template.Services;
+using BTCPayServer.Services;
 using BTCPayServer.Services.Invoices;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using NBitcoin;
 
 namespace BTCPayServer.Plugins.Template;
 
@@ -22,22 +24,66 @@ public class UIPluginController : Controller
     private readonly MyPluginService _PluginService;
     private readonly UserManager<ApplicationUser> _UserManager;
     private readonly InvoiceRepository _InvoiceRepository;
+    private readonly DisplayFormatter _DisplayFormatter;
 
-    public UIPluginController(MyPluginService PluginService, UserManager<ApplicationUser> userManager, InvoiceRepository invoiceRepository)
+    public UIPluginController(MyPluginService PluginService, UserManager<ApplicationUser> userManager, InvoiceRepository invoiceRepository, DisplayFormatter displayFormatter)
     {
         _PluginService = PluginService;
         _UserManager = userManager;
         _InvoiceRepository = invoiceRepository;
+        _DisplayFormatter = displayFormatter;
     }
 
     private string GetUserId() => _UserManager.GetUserId(User);
+
+
+    // This method is copy/pasted from BTCPayServer/Controllers/UIInvoiceController.UI.cs because it is private there
+    private InvoiceDetailsModel InvoicePopulatePayments(InvoiceEntity invoice)
+    {
+        // TODO Cleanup. DO we need this method?
+        var overpaid = false;
+        var model = new InvoiceDetailsModel
+        {
+            Archived = invoice.Archived,
+            Payments = invoice.GetPayments(false),
+            Overpaid = true,
+            CryptoPayments = invoice.GetPaymentMethods().Select(
+                data =>
+                {
+                    var accounting = data.Calculate();
+                    var paymentMethodId = data.GetId();
+                    var overpaidAmount = accounting.OverpaidHelper.ToDecimal(MoneyUnit.BTC);
+
+                    if (overpaidAmount > 0)
+                    {
+                        overpaid = true;
+                    }
+
+                    return new InvoiceDetailsModel.CryptoPayment
+                    {
+                        PaymentMethodId = paymentMethodId,
+                        PaymentMethod = paymentMethodId.ToPrettyString(),
+                        Due = _DisplayFormatter.Currency(accounting.Due.ToDecimal(MoneyUnit.BTC), paymentMethodId.CryptoCode),
+                        Paid = _DisplayFormatter.Currency(accounting.CryptoPaid.ToDecimal(MoneyUnit.BTC), paymentMethodId.CryptoCode),
+                        Overpaid = _DisplayFormatter.Currency(overpaidAmount, paymentMethodId.CryptoCode),
+                        // Address = data.GetPaymentMethodDetails().GetPaymentDestination(), // TODO: Commented this out because of error
+                        // Rate = ExchangeRate(data.GetId().CryptoCode, data), // TODO: Commented this out because of error
+                        PaymentMethodRaw = data
+                    };
+                }).ToList()
+        };
+        model.Overpaid = overpaid;
+
+        return model;
+    }
+
 
     // GET
     public async Task<IActionResult> Index()
     {
         var model = new PluginPageViewModel { Data = await _PluginService.Get() };
 
-
+// TODO Cleanup
         // var storeIds = new HashSet<string>();
         // if (fs.GetFilterArray("storeid") is string[] l)
         // {
