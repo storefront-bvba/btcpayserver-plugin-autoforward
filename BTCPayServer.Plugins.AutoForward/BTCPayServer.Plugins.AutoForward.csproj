@@ -6,8 +6,8 @@
 
   <!-- Plugin specific properties -->
   <PropertyGroup>
-    <Product>BTCPay Server Plugin Template</Product>
-    <Description>A template for your own BTCPay Server plugin.</Description>
+    <Product>Auto-Forward Payments</Product>
+    <Description>Adds the ability to auto-forward a payment once the invoice is settled and keep a fee (percentage) in the store.</Description>
     <Version>1.0.0</Version>
   </PropertyGroup>
 

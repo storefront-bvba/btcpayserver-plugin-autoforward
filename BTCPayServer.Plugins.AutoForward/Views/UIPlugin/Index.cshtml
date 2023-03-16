@@ -1,0 +1,196 @@
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Client.Models
+@using BTCPayServer.Components
+@using BTCPayServer.Plugins.Template.Views
+@using Microsoft.AspNetCore.Mvc.TagHelpers
+@model BTCPayServer.Plugins.Template.PluginPageViewModel
+@{
+    ViewData.SetActivePage(PluginNavPages.Index, "Auto-Forward Payments");
+}
+<h1>@ViewData["Title"]</h1>
+<p>This list shows all invoices that have auto-forwarding enabled. This means they have these metadata fields</p>
+<dl>
+    <dt>AutoForwardToAddress</dt>
+    <dd>Contains a valid destination where to forward the funds to</dd>
+    <dt>AutoForwardPercentage</dt>
+    <dd>Contains the percentage to auto-forward written as a number between 0 and 1</dd>
+</dl>
+
+
+<h2>Invoices</h2>
+
+<table>
+    <thead>
+    <tr>
+        <th>Invoice</th>
+        <th>Forward to</th>
+        <th>Percentage to forward</th>
+        <th>Invoice Status</th>
+        <th>Amount received</th>
+        <th>Amount forwarded</th>
+        <th>Forwarding Status</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
+    </tr>
+    </tbody>
+</table>
+
+
+
+
+ <div class="table-responsive">
+    <table id="invoices" class="table table-hover">
+        <thead>
+            <tr>
+                <th style="width:2rem;" class="only-for-js">
+                    <input id="selectAllCheckbox" type="checkbox" class="form-check-input" />
+                <th class="w-150px">
+                    <div class="d-flex align-items-center gap-1">
+                        Date
+                        <button type="button" class="btn btn-link p-0 fa fa-clock-o switch-time-format only-for-js" title="Switch date format"></button>
+                    </div>
+                </th>
+                <th class="text-nowrap">Order Id</th>
+                <th class="text-nowrap">Invoice Id</th>
+                <th>Status</th>
+                <th class="text-end">Amount</th>
+                <th class="text-end">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var invoice in Model.Invoices)
+            {
+                <tr id="invoice_@invoice.InvoiceId" class="invoice-row">
+                    <td class="only-for-js">
+                        <input name="selectedItems" type="checkbox" class="selector form-check-input" value="@invoice.InvoiceId" />
+                    </td>
+                    <td>@invoice.Date.ToBrowserDate()</td>
+                    <td style="max-width:120px;">
+                        @if (invoice.RedirectUrl != string.Empty)
+                        {
+                            <a href="@invoice.RedirectUrl" class="wraptextAuto" rel="noreferrer noopener">@invoice.OrderId</a>
+                        }
+                        else
+                        {
+                            <span class="wraptextAuto">@invoice.OrderId</span>
+                        }
+                    </td>
+                    <td class="text-break">@invoice.InvoiceId</td>
+                    <td>
+                        @if (invoice.Details.Archived)
+                        {
+                            <span class="badge bg-warning">archived</span>
+                        }
+                        @if (invoice.CanMarkStatus)
+                        {
+                            <div id="pavpill_@invoice.InvoiceId" class="badge badge-@invoice.Status.Status.ToModernStatus().ToString().ToLower()">
+                                <span class="dropdown-toggle changeInvoiceStateToggle" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                    @invoice.Status.ToString()
+                                </span>
+                                <div class="dropdown-menu">
+                                    @if (invoice.CanMarkInvalid)
+                                    {
+                                        <button type="button" class="dropdown-item lh-base changeInvoiceState" data-invoice-id="@invoice.InvoiceId" data-new-state="invalid">
+                                            Mark as invalid
+                                        </button>
+                                    }
+                                    @if (invoice.CanMarkSettled)
+                                    {
+                                        <button type="button" class="dropdown-item lh-base changeInvoiceState" data-invoice-id="@invoice.InvoiceId" data-new-state="settled">
+                                            Mark as settled
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <span class="badge badge-@invoice.Status.Status.ToModernStatus().ToString().ToLower()">
+                                @invoice.Status.Status.ToModernStatus().ToString()
+                                @if (invoice.Status.ExceptionStatus != InvoiceExceptionStatus.None)
+                                {
+                                    @($"({invoice.Status.ExceptionStatus.ToString()})")
+                                }
+                            </span>
+                        }
+                        @foreach (var paymentType in invoice.Details.Payments.Select(payment => payment.GetPaymentMethodId()?.PaymentType).Distinct().Where(type => type != null && !string.IsNullOrEmpty(type.GetBadge())))
+                        {
+                            <span class="badge">@paymentType.GetBadge()</span>
+                        }
+                        @if (invoice.HasRefund)
+                        {
+                            <span class="badge bg-warning">Refund</span>
+                        }
+                    </td>
+                    <td class="text-end text-nowrap">@DisplayFormatter.Currency(invoice.Amount, invoice.Currency)</td>
+                    <td class="text-end text-nowrap">
+                        @if (invoice.ShowCheckout)
+                        {
+                            <span>
+                                <a asp-action="Checkout" asp-route-invoiceId="@invoice.InvoiceId" class="invoice-checkout-link" id="invoice-checkout-@invoice.InvoiceId">Checkout</a>
+                                <a asp-action="Checkout" asp-route-invoiceId="@invoice.InvoiceId" class="showInvoice only-for-js" data-invoice-id="@invoice.InvoiceId">[^]</a>
+                                @if (!invoice.CanMarkStatus)
+                                {
+                                    <span>-</span>
+                                }
+                            </span>
+                        }
+                        &nbsp;
+                        <a asp-action="Invoice" class="invoice-details-link" asp-route-invoiceId="@invoice.InvoiceId">Details</a>
+                        <a class="only-for-js invoice-details-toggle" href="#">
+                            <span title="Invoice Details Toggle" class="fa fa-1x fa-angle-double-down"></span>
+                        </a>
+                    </td>
+                </tr>
+                <tr id="invoice_details_@invoice.InvoiceId" class="invoice-details-row" style="display:none;">
+                    <td colspan="99" class="border-top-0">
+                        @* Leaving this as partial because it abstracts complexity of Invoice Payments *@
+                        <partial name="ListInvoicesPaymentsPartial" model="(invoice.Details, true)" />
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<vc:pager view-model="Model" />
+
+
+
+
+<!--
+<h2>Totals</h2>
+- Total received
+- Total to be forwarded
+- Total already forwarded
+-->
+
+<!--
+
+
+<a href="https://twitter.com/NicolasDorier/status/1307221679014256640">
+    <img src="/Resources/img/screengrab.png"/>
+</a>
+
+
+<h2>Persisted Data</h2>
+<p>
+    The following is data persisted to the configured database but in an isolated DbContext.
+    Every time you start BTCPay Server with this plugin enabled, a timestamp is logged.
+</p>
+<ul class="list-group">
+    @foreach (var item in Model.Data)
+    {
+        <li class="list-group-item">@item.Id at @item.Timestamp.ToString("F")</li>
+    }
+</ul>
+-->
