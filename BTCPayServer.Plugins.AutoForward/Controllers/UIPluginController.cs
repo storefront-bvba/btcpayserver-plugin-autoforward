@@ -28,62 +28,66 @@ public class UIPluginController : Controller
     private readonly UserManager<ApplicationUser> _UserManager;
     private readonly InvoiceRepository _InvoiceRepository;
     private readonly DisplayFormatter _DisplayFormatter;
+    private readonly AutoForwardInvoiceHelper _helper;
 
-    public UIPluginController(MyPluginService PluginService, UserManager<ApplicationUser> userManager, InvoiceRepository invoiceRepository, DisplayFormatter displayFormatter)
+    public UIPluginController(MyPluginService PluginService, UserManager<ApplicationUser> userManager, InvoiceRepository invoiceRepository, DisplayFormatter displayFormatter, AutoForwardInvoiceHelper helper)
     {
         _PluginService = PluginService;
         _UserManager = userManager;
         _InvoiceRepository = invoiceRepository;
         _DisplayFormatter = displayFormatter;
+        _helper = helper;
     }
 
     private string GetUserId() => _UserManager.GetUserId(User);
 
 
     // This method is copy/pasted from BTCPayServer/Controllers/UIInvoiceController.UI.cs because it is private there
-    private InvoiceDetailsModel InvoicePopulatePayments(InvoiceEntity invoice)
-    {
-        // TODO Cleanup. DO we need this method?
-        var overpaid = false;
-        var model = new InvoiceDetailsModel
-        {
-            Archived = invoice.Archived,
-            Payments = invoice.GetPayments(false),
-            Overpaid = true,
-            CryptoPayments = invoice.GetPaymentMethods().Select(
-                data =>
-                {
-                    var accounting = data.Calculate();
-                    var paymentMethodId = data.GetId();
-                    var overpaidAmount = accounting.OverpaidHelper.ToDecimal(MoneyUnit.BTC);
-
-                    if (overpaidAmount > 0)
-                    {
-                        overpaid = true;
-                    }
-
-                    return new InvoiceDetailsModel.CryptoPayment
-                    {
-                        PaymentMethodId = paymentMethodId,
-                        PaymentMethod = paymentMethodId.ToPrettyString(),
-                        Due = _DisplayFormatter.Currency(accounting.Due.ToDecimal(MoneyUnit.BTC), paymentMethodId.CryptoCode),
-                        Paid = _DisplayFormatter.Currency(accounting.CryptoPaid.ToDecimal(MoneyUnit.BTC), paymentMethodId.CryptoCode),
-                        Overpaid = _DisplayFormatter.Currency(overpaidAmount, paymentMethodId.CryptoCode),
-                        // Address = data.GetPaymentMethodDetails().GetPaymentDestination(), // TODO: Commented this out because of error
-                        // Rate = ExchangeRate(data.GetId().CryptoCode, data), // TODO: Commented this out because of error
-                        PaymentMethodRaw = data
-                    };
-                }).ToList()
-        };
-        model.Overpaid = overpaid;
-
-        return model;
-    }
+    // private InvoiceDetailsModel InvoicePopulatePayments(InvoiceEntity invoice)
+    // {
+    //     // TODO Cleanup. DO we need this method?
+    //     var overpaid = false;
+    //     var model = new InvoiceDetailsModel
+    //     {
+    //         Archived = invoice.Archived,
+    //         Payments = invoice.GetPayments(false),
+    //         Overpaid = true,
+    //         CryptoPayments = invoice.GetPaymentMethods().Select(
+    //             data =>
+    //             {
+    //                 var accounting = data.Calculate();
+    //                 var paymentMethodId = data.GetId();
+    //                 var overpaidAmount = accounting.OverpaidHelper.ToDecimal(MoneyUnit.BTC);
+    //
+    //                 if (overpaidAmount > 0)
+    //                 {
+    //                     overpaid = true;
+    //                 }
+    //
+    //                 return new InvoiceDetailsModel.CryptoPayment
+    //                 {
+    //                     PaymentMethodId = paymentMethodId,
+    //                     PaymentMethod = paymentMethodId.ToPrettyString(),
+    //                     Due = _DisplayFormatter.Currency(accounting.Due.ToDecimal(MoneyUnit.BTC), paymentMethodId.CryptoCode),
+    //                     Paid = _DisplayFormatter.Currency(accounting.CryptoPaid.ToDecimal(MoneyUnit.BTC), paymentMethodId.CryptoCode),
+    //                     Overpaid = _DisplayFormatter.Currency(overpaidAmount, paymentMethodId.CryptoCode),
+    //                     // Address = data.GetPaymentMethodDetails().GetPaymentDestination(), // TODO: Commented this out because of error
+    //                     // Rate = ExchangeRate(data.GetId().CryptoCode, data), // TODO: Commented this out because of error
+    //                     PaymentMethodRaw = data
+    //                 };
+    //             }).ToList()
+    //     };
+    //     model.Overpaid = overpaid;
+    //
+    //     return model;
+    // }
 
 
     // GET
     public async Task<IActionResult> Index()
     {
+        
+        
         var model = new PluginPageViewModel { Data = await _PluginService.Get() };
 
 // TODO Cleanup
@@ -112,12 +116,19 @@ public class UIPluginController : Controller
         invoiceQuery.Skip = model.Skip;
         invoiceQuery.IncludeRefunds = true;
 
-        var list = await _InvoiceRepository.GetInvoices(invoiceQuery);
+        //var list = await _InvoiceRepository.GetInvoices(invoiceQuery);
+        var list = await _helper.getAutoForwardableInvoices();
 
         foreach (var invoice in list)
         {
             AutoForwardInvoiceMetadata meta = AutoForwardInvoiceMetadata.FromJObject(invoice.Metadata.ToJObject());
             var state = invoice.GetInvoiceState();
+            var pm = "BTC-OnChain"; // TODO make dynamic
+
+            var amountReceived = AutoForwardInvoiceHelper.getAmountReceived(invoice, pm);
+            var payments = invoice.GetPayments(false);
+            var hasRefund = invoice.Refunds.Any(data => !data.PullPaymentData.Archived);
+            
             model.Invoices.Add(new AutoForwardableInvoiceModel()
             {
                 Status = state,
@@ -126,12 +137,13 @@ public class UIPluginController : Controller
                 OrderId = invoice.Metadata.OrderId ?? string.Empty,
                 Amount = invoice.Price,
                 Currency = invoice.Currency,
-                HasRefund = invoice.Refunds.Any(data => !data.PullPaymentData.Archived), // TODO do something with refund info?
-                Payments = invoice.GetPayments(false),
+                HasRefund = hasRefund, // TODO do something with refund info?
+                Payments = payments,
                 AutoForwardToAddress = meta.AutoForwardToAddress,
                 AutoForwardPayoutId = meta.AutoForwardPayoutId,
                 AutoForwardPercentage = meta.AutoForwardPercentage,
-                AmountReceived = AutoForwardInvoiceHelper.getAmountReceived(invoice)
+                AmountReceived = amountReceived,
+                AmountReceivedCryptoCode = "BTC" // TODO make dynamic
             });
         }
 
@@ -165,5 +177,6 @@ public class AutoForwardableInvoiceModel
     
     public bool HasRefund { get; set; }
     public List<PaymentEntity> Payments { get; set; }
-    public decimal AmountReceived { get; set; }
+    public Money AmountReceived { get; set; }
+    public string AmountReceivedCryptoCode { get; set; }
 }

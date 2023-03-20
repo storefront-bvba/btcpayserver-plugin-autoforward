@@ -18,9 +18,11 @@ public class Plugin : BaseBTCPayServerPlugin
     {
         services.AddSingleton<IUIExtension>(new UIExtension("TemplatePluginHeaderNav", "header-nav"));
         services.AddHostedService<ApplicationPartsLogger>();
+        // services.AddHostedService<PayoutUpdater>();
         services.AddHostedService<PluginMigrationRunner>();
         services.AddSingleton<MyPluginService>();
         services.AddSingleton<MyPluginDbContextFactory>();
+        services.AddSingleton<AutoForwardInvoiceHelper>();
         services.AddHostedService<InvoiceWatcher>();
         services.AddDbContext<MyPluginDbContext>((provider, o) =>
         {
