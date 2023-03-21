@@ -1,9 +1,11 @@
 @using BTCPayServer.Abstractions.Extensions
 @using BTCPayServer.Client.Models
 @using BTCPayServer.Components
+@using BTCPayServer.Plugins.AutoForward.Views
 @using BTCPayServer.Plugins.Template.Views
 @using BTCPayServer.Services
 @using BTCPayServer.Services.Invoices
+@using BTCPayServer.Views.Server
 @using Microsoft.AspNetCore.Mvc.TagHelpers
 @using NBitcoin
 @inject DisplayFormatter DisplayFormatter
@@ -17,7 +19,13 @@
     <h2 class="mb-0">
         @ViewData["Title"]
     </h2>
-
+    <nav id="SectionNav">
+            <div class="nav">
+                <a id="SectionNav-@AutoForwardNavPages.Invoices" class="nav-link @ViewData.IsActivePage(AutoForwardNavPages.Invoices)" asp-action="Index">Auto-Forwardable Invoices</a>
+                <a id="SectionNav-@AutoForwardNavPages.Payouts" class="nav-link @ViewData.IsActivePage(AutoForwardNavPages.Payouts)" asp-action="Payouts">Payouts</a>
+            </div>
+        </nav>
+    
     @* 
     TODO add support to manually create an auto-forwardable invoice?
     <a id="CreateNewInvoice" asp-action="CreateInvoice" asp-route-storeId="@Model.StoreId" asp-route-searchTerm="@Model.SearchTerm" class="btn btn-primary mt-3 mt-sm-0"> *@
@@ -58,6 +66,7 @@ curl -v --header "Authorization: token YOUR_API_KEY_COMES_HERE" --data '{amount:
             <th class="text-nowrap text-end">Amount invoiced</th>
             <th class="text-nowrap text-end">Amount received</th>
             <th class="text-nowrap text-end">Amount forwarded</th>
+            <th class="text-nowrap">Payout ID</th>
             <th class="text-nowrap">Forwarding Status</th>
         </tr>
         </thead>
@@ -123,6 +132,9 @@ curl -v --header "Authorization: token YOUR_API_KEY_COMES_HERE" --data '{amount:
                 <td></td>
                 <td></td>
                 <td></td>
+                <td>
+                    @invoice.AutoForwardPayoutId
+                </td>
                 <td></td>
             </tr>
         }
@@ -131,6 +143,7 @@ curl -v --header "Authorization: token YOUR_API_KEY_COMES_HERE" --data '{amount:
 </div>
 
 <vc:pager view-model="Model"/>
+
 
 
 @* <h2>Totals</h2> *@

@@ -20,9 +20,8 @@ using NBitcoin;
 
 namespace BTCPayServer.Plugins.Template;
 
-[Route("~/plugins/autoforward")]
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
-public class UIPluginController : Controller
+public class UIAutoForwardController : Controller
 {
     private readonly MyPluginService _PluginService;
     private readonly UserManager<ApplicationUser> _UserManager;
@@ -30,7 +29,7 @@ public class UIPluginController : Controller
     private readonly DisplayFormatter _DisplayFormatter;
     private readonly AutoForwardInvoiceHelper _helper;
 
-    public UIPluginController(MyPluginService PluginService, UserManager<ApplicationUser> userManager, InvoiceRepository invoiceRepository, DisplayFormatter displayFormatter, AutoForwardInvoiceHelper helper)
+    public UIAutoForwardController(MyPluginService PluginService, UserManager<ApplicationUser> userManager, InvoiceRepository invoiceRepository, DisplayFormatter displayFormatter, AutoForwardInvoiceHelper helper)
     {
         _PluginService = PluginService;
         _UserManager = userManager;
@@ -83,11 +82,9 @@ public class UIPluginController : Controller
     // }
 
 
-    // GET
+    [Route("~/plugins/autoforward")]
     public async Task<IActionResult> Index()
     {
-        
-        
         var model = new PluginPageViewModel { Data = await _PluginService.Get() };
 
 // TODO Cleanup
@@ -148,6 +145,13 @@ public class UIPluginController : Controller
         }
 
 
+        return View(model);
+    }
+
+    [Route("~/plugins/autoforward/payouts")]
+    public async Task<IActionResult> Payouts()
+    {
+        var model = new PluginPageViewModel { Data = await _PluginService.Get() };
         return View(model);
     }
 

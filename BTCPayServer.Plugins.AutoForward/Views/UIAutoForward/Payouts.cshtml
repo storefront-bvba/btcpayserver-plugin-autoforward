@@ -1,0 +1,47 @@
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Client.Models
+@using BTCPayServer.Components
+@using BTCPayServer.Plugins.AutoForward.Views
+@using BTCPayServer.Plugins.Template.Views
+@using BTCPayServer.Services
+@using BTCPayServer.Services.Invoices
+@using Microsoft.AspNetCore.Mvc.TagHelpers
+@using NBitcoin
+@inject DisplayFormatter DisplayFormatter
+@model BTCPayServer.Plugins.Template.PluginPageViewModel
+@{
+    ViewData.SetActivePage(PluginNavPages.Index, "Auto-Forward Payments");
+}
+
+<div class="sticky-header-setup"></div>
+<div class="sticky-header d-sm-flex align-items-center justify-content-between">
+    <h2 class="mb-0">
+        @ViewData["Title"]
+    </h2>
+    <nav id="SectionNav">
+        <div class="nav">
+            <a id="SectionNav-@AutoForwardNavPages.Invoices" class="nav-link @ViewData.IsActivePage(AutoForwardNavPages.Invoices)" asp-action="Index">Auto-Forwardable Invoices</a>
+            <a id="SectionNav-@AutoForwardNavPages.Payouts" class="nav-link @ViewData.IsActivePage(AutoForwardNavPages.Payouts)" asp-action="Payouts">Payouts</a>
+        </div>
+    </nav>
+</div>
+
+
+<h2>Payouts</h2>
+<div class="table-responsive">
+    <table id="payouts" class="table table-hover">
+        <thead>
+        <tr>
+            <th>Date</th>
+            <th class="text-nowrap">Payout ID</th>
+            <th class="text-nowrap">Invoice ID</th>
+            <th class="text-nowrap">Order ID</th>
+        </tr>
+        </thead>
+        <tbody>
+       
+        </tbody>
+    </table>
+</div>
+
+<vc:pager view-model="Model"/>
