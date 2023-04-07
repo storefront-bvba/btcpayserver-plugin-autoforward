@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Contracts;
+using BTCPayServer.Client;
 using BTCPayServer.Client.Models;
 using BTCPayServer.Data;
 using BTCPayServer.Logging;
@@ -12,6 +13,7 @@ using BTCPayServer.Payments;
 using BTCPayServer.Plugins.AutoForward.Data;
 using BTCPayServer.Services.Invoices;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using NBitcoin;
 using PayoutData = BTCPayServer.Client.Models.PayoutData;
 
@@ -22,12 +24,14 @@ public class AutoForwardInvoiceHelper
     private readonly ApplicationDbContextFactory _applicationDbContextFactory;
     private readonly InvoiceRepository _invoiceRepository;
     private readonly IBTCPayServerClientFactory _btcPayServerClientFactory;
+    private readonly ILogger _logger;
 
-    public AutoForwardInvoiceHelper(ApplicationDbContextFactory applicationDbContextFactory, InvoiceRepository invoiceRepository, IBTCPayServerClientFactory btcPayServerClientFactory)
+    public AutoForwardInvoiceHelper(ApplicationDbContextFactory applicationDbContextFactory, InvoiceRepository invoiceRepository, IBTCPayServerClientFactory btcPayServerClientFactory, ILoggerFactory loggerFactory)
     {
         _applicationDbContextFactory = applicationDbContextFactory;
         _invoiceRepository = invoiceRepository;
         _btcPayServerClientFactory = btcPayServerClientFactory;
+        _logger = loggerFactory.CreateLogger("AutoForward");
     }
 
 
@@ -54,14 +58,14 @@ public class AutoForwardInvoiceHelper
     public async Task<InvoiceEntity[]> GetAutoForwardableInvoicesNotPaidOut()
     {
         // TODO this method does not scale and will be very slow if the invoice list is long
-        return await GetInvoicesBySql($"select * FROM \"Invoices\" where \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardToAddress' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPercentage' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'AutoForwardCompletedPayoutId' is null and \"Status\" = 'confirmed'");
+        return await GetInvoicesBySql($"select * FROM \"Invoices\" where \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardToAddress' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPercentage' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'AutoForwardCompletedPayoutId' is null and \"Status\" = 'complete'");
     }
 
     public async Task<InvoiceEntity[]> GetUnprocessedInvoicesLinkedToDestination(string destination, string storeId)
     {
         // TODO this method does not scale and will be very slow if the invoice list is long
         // TODO switch to SQL prepared statements
-        string sql = $"select * FROM \"Invoices\" where \"Blob2\"::jsonb -> 'metadata' ->> 'autoForwardToAddress' = '{destination}' and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPercentage' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'AutoForwardCompletedPayoutId' is null and \"Status\" = 'confirmed' and \"StoreDataId\" = '{storeId}'";
+        string sql = $"select * FROM \"Invoices\" where \"Blob2\"::jsonb -> 'metadata' ->> 'autoForwardToAddress' = '{destination}' and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPercentage' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'AutoForwardCompletedPayoutId' is null and \"Status\" = 'complete' and \"StoreDataId\" = '{storeId}'";
         return await GetInvoicesBySql(sql);
     }
 
@@ -183,43 +187,77 @@ public class AutoForwardInvoiceHelper
 
             foreach (var invoice in invoices)
             {
-                await WriteToLog($"Cancelled previous Payout ID {payout.Id} because the amount should be {totalAmount} instead of {payout.Amount}", invoice.Id);
+                await WriteToLog($"Cancelled previous Payout ID {payout.Id} because the amount should be {totalAmount} {cryptoCode} instead of {payout.Amount}", invoice.Id);
             }
         }
 
-        // Create a new payout for the correct amount
-        payout = await CreatePayout(destination, totalAmount, paymentMethod, storeId, cancellationToken);
-
-        string invoiceText = "";
-        for (int i = 0; i < invoicesIncludedInPayout.Count; i++)
+        try
         {
-            bool isFirst = i == 0;
-            bool isLast = i == invoicesIncludedInPayout.Count - 1;
-
-            if (!isFirst)
+            // Create a new payout for the correct amount
+            payout = await CreatePayout(destination, totalAmount, paymentMethod, storeId, cancellationToken);
+            
+            string invoiceText = "";
+            for (int i = 0; i < invoicesIncludedInPayout.Count; i++)
             {
-                if (isLast)
+                bool isFirst = i == 0;
+                bool isLast = i == invoicesIncludedInPayout.Count - 1;
+
+                if (!isFirst)
                 {
-                    invoiceText += " and ";
+                    if (isLast)
+                    {
+                        invoiceText += " and ";
+                    }
+                    else
+                    {
+                        invoiceText += ", ";
+                    }
+                }
+
+                invoiceText += invoicesIncludedInPayout[i].Id;
+            }
+
+            foreach (var invoice in invoices)
+            {
+                await WriteToLog($"Created new Payout ID {payout.Id} for {totalAmount} {cryptoCode} containing the payouts for invoices {invoiceText}.", invoice.Id);
+            }
+            
+        }
+        catch (GreenfieldAPIException e)
+        {
+            if (e.APIError.Code.Equals("duplicate-destination"))
+            {
+                
+                var existingPayout = await GetPayoutForDestination(cryptoCode, destination, storeId, cancellationToken);
+
+                if (existingPayout.Amount.Equals(totalAmount))
+                {
+                    // A payout with this destination already exists and the amount is accurate. Do nothing.
+                    _logger.LogInformation("A payout already exists to {Destination} with the correct amount ({TotalAmount} {CryptoCode}).", destination, totalAmount, cryptoCode);
                 }
                 else
                 {
-                    invoiceText += ", ";
+                    // The amount does not match. This is serious!
+                    _logger.LogError("Could not create payout to {Destination} for {TotalAmount} {CryptoCode}. One already exists, but this was not expected.", destination, totalAmount, cryptoCode);
+                    
+                    // TODO should we throw?
+                    //throw;
                 }
+
+                // TODO is this ok? This seams to happen a lot. Are ae having race conditions?
             }
-
-            invoiceText += invoicesIncludedInPayout[i].Id;
+            else
+            {
+                throw;
+            }
         }
 
-        foreach (var invoice in invoices)
-        {
-            await WriteToLog($"Created new Payout ID {payout.Id} for {totalAmount} containing the payouts for invoices {invoiceText}.", invoice.Id);
-        }
+        
     }
 
     private async Task WriteToLog(string message, string invoiceId)
     {
-        WriteToLog($"Invoice {invoiceId}: {message}");
+        _logger.LogInformation("Invoice {InvoiceId}: {Message}", invoiceId, message);
 
         InvoiceLogs logs = new InvoiceLogs();
         string prefix = "Auto-Forwarding: ";
@@ -235,8 +273,5 @@ public class AutoForwardInvoiceHelper
         return payout;
     }
 
-    public void WriteToLog(string message)
-    {
-        // TODO write to log DB table
-    }
+ 
 }

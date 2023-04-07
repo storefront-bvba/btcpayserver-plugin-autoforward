@@ -46,7 +46,9 @@
 </ul>
 <p>Creating these invoices is currently only possible using the Greenfield API. For example:</p>
 <pre>
-curl -v --header "Authorization: token YOUR_API_KEY_COMES_HERE" --data '{amount: 50, metadata: { autoForwardToAddress: "abc", autoForwardPercentage: 0.99 }}' --header "Content-Type: application/json" http://127.0.0.1:14142/api/v1/stores/YOUR_STORE_ID_COMES_HERE/invoices
+    <code>
+    curl -v --header "Authorization: token YOUR_API_KEY_COMES_HERE" --data '{amount: 50, metadata: { autoForwardToAddress: "abc", autoForwardPercentage: 0.99 }}' --header "Content-Type: application/json" http://127.0.0.1:14142/api/v1/stores/YOUR_STORE_ID_COMES_HERE/invoices
+    </code>
 </pre>
 
 
@@ -64,8 +66,8 @@ curl -v --header "Authorization: token YOUR_API_KEY_COMES_HERE" --data '{amount:
             <th class="text-nowrap text-end">Amount invoiced</th>
             <th class="text-nowrap text-end">Amount received</th>
             <th class="text-nowrap text-end">Amount forwarded</th>
-            <th class="text-nowrap">Payout</th>
             <th class="text-nowrap">Forwarding Status</th>
+            <th class="text-nowrap">Payout</th>
         </tr>
         </thead>
         <tbody>
@@ -129,11 +131,9 @@ curl -v --header "Authorization: token YOUR_API_KEY_COMES_HERE" --data '{amount:
 
                 <td></td>
                 <td></td>
-                <td></td>
                 <td>
                     @invoice.AutoForwardPayout?.Id
                 </td>
-                <td></td>
             </tr>
         }
         </tbody>
