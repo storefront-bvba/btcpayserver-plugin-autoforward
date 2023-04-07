@@ -7,11 +7,8 @@ using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Client;
 using BTCPayServer.Data;
 using BTCPayServer.Models;
-using BTCPayServer.Models.InvoicingModels;
 using BTCPayServer.Plugins.AutoForward.Data;
 using BTCPayServer.Plugins.AutoForward.Services;
-using BTCPayServer.Plugins.Template.Data;
-using BTCPayServer.Plugins.Template.Services;
 using BTCPayServer.Services;
 using BTCPayServer.Services.Invoices;
 using Microsoft.AspNetCore.Authorization;
@@ -19,27 +16,27 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using NBitcoin;
 
-namespace BTCPayServer.Plugins.Template;
+namespace BTCPayServer.Plugins.AutoForward.Controllers;
 
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIAutoForwardController : Controller
 {
-    private readonly MyPluginService _PluginService;
-    private readonly UserManager<ApplicationUser> _UserManager;
-    private readonly InvoiceRepository _InvoiceRepository;
-    private readonly DisplayFormatter _DisplayFormatter;
+    private readonly MyPluginService _pluginService;
+    private readonly UserManager<ApplicationUser> _userManager;
+    private readonly InvoiceRepository _invoiceRepository;
+    private readonly DisplayFormatter _displayFormatter;
     private readonly AutoForwardInvoiceHelper _helper;
 
-    public UIAutoForwardController(MyPluginService PluginService, UserManager<ApplicationUser> userManager, InvoiceRepository invoiceRepository, DisplayFormatter displayFormatter, AutoForwardInvoiceHelper helper)
+    public UIAutoForwardController(MyPluginService pluginService, UserManager<ApplicationUser> userManager, InvoiceRepository invoiceRepository, DisplayFormatter displayFormatter, AutoForwardInvoiceHelper helper)
     {
-        _PluginService = PluginService;
-        _UserManager = userManager;
-        _InvoiceRepository = invoiceRepository;
-        _DisplayFormatter = displayFormatter;
+        _pluginService = pluginService;
+        _userManager = userManager;
+        _invoiceRepository = invoiceRepository;
+        _displayFormatter = displayFormatter;
         _helper = helper;
     }
 
-    private string GetUserId() => _UserManager.GetUserId(User);
+    private string GetUserId() => _userManager.GetUserId(User);
 
 
     // This method is copy/pasted from BTCPayServer/Controllers/UIInvoiceController.UI.cs because it is private there
@@ -86,7 +83,7 @@ public class UIAutoForwardController : Controller
     [Route("~/plugins/autoforward")]
     public async Task<IActionResult> Index(CancellationToken cancellationToken = default)
     {
-        var model = new PluginPageViewModel { Data = await _PluginService.Get() };
+        var model = new PluginPageViewModel { Data = await _pluginService.Get() };
 
 // TODO Cleanup
         // var storeIds = new HashSet<string>();
@@ -101,7 +98,6 @@ public class UIAutoForwardController : Controller
         //     model.StoreId = storeId;
         // }
         // model.StoreIds = storeIds.ToArray();
-        string storeId = null;
 
         var invoiceQuery = new InvoiceQuery()
         {
@@ -164,7 +160,7 @@ public class UIAutoForwardController : Controller
     [Route("~/plugins/autoforward/payouts")]
     public async Task<IActionResult> Payouts()
     {
-        var model = new PluginPageViewModel { Data = await _PluginService.Get() };
+        var model = new PluginPageViewModel { Data = await _pluginService.Get() };
         return View(model);
     }
 

@@ -27,7 +27,7 @@ public class AutoForwardInvoiceMetadata: InvoiceMetadata
         set => this.SetAdditionalData("autoForwardPercentage", value);
     }
     
-    public static AutoForwardInvoiceMetadata FromJObject(JObject jObject)
+    public new static AutoForwardInvoiceMetadata FromJObject(JObject jObject)
     {
         return jObject.ToObject<AutoForwardInvoiceMetadata>(MetadataSerializer);
     }

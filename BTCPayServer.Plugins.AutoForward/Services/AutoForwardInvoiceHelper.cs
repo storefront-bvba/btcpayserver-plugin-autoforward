@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Data.Common;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Client.Models;
 using BTCPayServer.Data;
-using BTCPayServer.HostedServices;
 using BTCPayServer.Logging;
 using BTCPayServer.Payments;
 using BTCPayServer.Plugins.AutoForward.Data;
@@ -22,7 +22,6 @@ public class AutoForwardInvoiceHelper
     private readonly ApplicationDbContextFactory _applicationDbContextFactory;
     private readonly InvoiceRepository _invoiceRepository;
     private readonly IBTCPayServerClientFactory _btcPayServerClientFactory;
-    private readonly PullPaymentHostedService _pullPaymentService;
 
     public AutoForwardInvoiceHelper(ApplicationDbContextFactory applicationDbContextFactory, InvoiceRepository invoiceRepository, IBTCPayServerClientFactory btcPayServerClientFactory)
     {
@@ -49,27 +48,29 @@ public class AutoForwardInvoiceHelper
     public async Task<InvoiceEntity[]> GetAutoForwardableInvoices()
     {
         // TODO this method does not scale and will be very slow if the invoice list is long
-        return await GetInvoicesBySql($"select * FROM \"Invoices\" where \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardToAddress' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPercentage' is not null order by \"Created\" desc");
+        return await GetInvoicesBySql($"select * FROM \"Invoices\" where \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardToAddress' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPercentage' is not null");
     }
 
     public async Task<InvoiceEntity[]> GetAutoForwardableInvoicesNotPaidOut()
     {
         // TODO this method does not scale and will be very slow if the invoice list is long
-        return await GetInvoicesBySql($"select * FROM \"Invoices\" where \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardToAddress' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPercentage' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'AutoForwardCompletedPayoutId' is null and status = \"settled\" order by \"Created\" desc");
+        return await GetInvoicesBySql($"select * FROM \"Invoices\" where \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardToAddress' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPercentage' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'AutoForwardCompletedPayoutId' is null and \"Status\" = 'confirmed'");
     }
 
     public async Task<InvoiceEntity[]> GetUnprocessedInvoicesLinkedToDestination(string destination, string storeId)
     {
         // TODO this method does not scale and will be very slow if the invoice list is long
-        return await GetInvoicesBySql($"select * FROM \"Invoices\" where \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardToAddress' = \"{destination}\" and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPercentage' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'AutoForwardCompletedPayoutId' is null and status = \"settled\" and StoreDataId = \"{storeId}\" order by \"Created\" desc");
+        // TODO switch to SQL prepared statements
+        string sql = $"select * FROM \"Invoices\" where \"Blob2\"::jsonb -> 'metadata' ->> 'autoForwardToAddress' = '{destination}' and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPercentage' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'AutoForwardCompletedPayoutId' is null and \"Status\" = 'confirmed' and \"StoreDataId\" = '{storeId}'";
+        return await GetInvoicesBySql(sql);
     }
 
-    private async Task<InvoiceEntity[]> GetInvoicesBySql(FormattableString sql)
+    private async Task<InvoiceEntity[]> GetInvoicesBySql(string sql)
     {
         using var context = _applicationDbContextFactory.CreateContext();
         IQueryable<BTCPayServer.Data.InvoiceData> query =
             context
-                .Invoices.FromSqlInterpolated(sql)
+                .Invoices.FromSqlRaw(sql).OrderByDescending(invoice => invoice.Created)
                 .Include(o => o.Payments)
                 .Include(o => o.Refunds).ThenInclude(refundData => refundData.PullPaymentData);
 
@@ -79,7 +80,7 @@ public class AutoForwardInvoiceHelper
     public string[] GetCompletedPayoutIds()
     {
         // TODO this method does not scale and will be very slow if the invoice list is long
-        string sql = "select distinct \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardCompletedPayoutId' as payoutId FROM \"Invoices\" where \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardToAddress' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPercentage' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardCompletedPayoutId' is not null order by \"Created\" desc ";
+        string sql = "select distinct \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardCompletedPayoutId' as payoutId FROM \"Invoices\" where \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardToAddress' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPercentage' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardCompletedPayoutId' is not null";
         return null;
     }
 
@@ -160,11 +161,11 @@ public class AutoForwardInvoiceHelper
 
         foreach (var invoiceEntity in invoices)
         {
-            var amountReceived = GetAmountReceived(invoiceEntity, paymentMethod);
+            var amountReceived = GetAmountReceived(invoiceEntity, paymentMethod).ToDecimal(MoneyUnit.BTC);
             if (amountReceived > 0)
             {
                 invoicesIncludedInPayout.Add(invoiceEntity);
-                totalAmount += amountReceived.ToDecimal(MoneyUnit.BTC);
+                totalAmount += amountReceived;
             }
         }
 

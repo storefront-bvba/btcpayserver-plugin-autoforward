@@ -1,10 +1,11 @@
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Abstractions.Models;
+using BTCPayServer.Plugins.AutoForward.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Options;
 
-namespace BTCPayServer.Plugins.Template;
+namespace BTCPayServer.Plugins.AutoForward;
 
 public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<MyPluginDbContext>
 {
@@ -20,7 +21,7 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<MyPluginDb
 
 public class MyPluginDbContextFactory : BaseDbContextFactory<MyPluginDbContext>
 {
-    public MyPluginDbContextFactory(IOptions<DatabaseOptions> options) : base(options, "BTCPayServer.Plugins.Template")
+    public MyPluginDbContextFactory(IOptions<DatabaseOptions> options) : base(options, "BTCPayServer.Plugins.AutoForward")
     {
     }
 

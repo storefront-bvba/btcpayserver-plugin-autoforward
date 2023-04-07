@@ -28,7 +28,7 @@ public class InvoiceWatcher : EventHostedServiceBase
         Subscribe<InvoiceEvent>();
     }
 
-    protected async override Task ProcessEvent(object evt, CancellationToken cancellationToken)
+    protected override Task ProcessEvent(object evt, CancellationToken cancellationToken)
     {
         if (evt is InvoiceEvent invoiceEvent)
         {
@@ -39,6 +39,8 @@ public class InvoiceWatcher : EventHostedServiceBase
                 _autoForwardInvoiceHelper.SyncPayoutForInvoice(invoice, cancellationToken);
             }
         }
+
+        return Task.CompletedTask;
     }
 
 }

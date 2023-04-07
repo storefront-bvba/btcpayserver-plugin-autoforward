@@ -2,14 +2,12 @@
 @using BTCPayServer.Client.Models
 @using BTCPayServer.Components
 @using BTCPayServer.Plugins.AutoForward.Views
-@using BTCPayServer.Plugins.Template.Views
 @using BTCPayServer.Services
 @using BTCPayServer.Services.Invoices
-@using BTCPayServer.Views.Server
 @using Microsoft.AspNetCore.Mvc.TagHelpers
 @using NBitcoin
 @inject DisplayFormatter DisplayFormatter
-@model BTCPayServer.Plugins.Template.PluginPageViewModel
+@model BTCPayServer.Plugins.AutoForward.Controllers.PluginPageViewModel
 @{
     ViewData.SetActivePage(PluginNavPages.Index, "Auto-Forward Payments");
 }

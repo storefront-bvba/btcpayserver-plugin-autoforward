@@ -2,12 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using BTCPayServer.Plugins.Template.Data;
+using BTCPayServer.Plugins.AutoForward.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
-namespace BTCPayServer.Plugins.Template;
+namespace BTCPayServer.Plugins.AutoForward.Data;
 
 public class MyPluginDbContext : DbContext
 {
@@ -24,7 +24,9 @@ public class MyPluginDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-        modelBuilder.HasDefaultSchema("BTCPayServer.Plugins.Template");
+        modelBuilder.HasDefaultSchema("BTCPayServer.Plugins.AutoForward");
+        
+        
         if (Database.IsSqlite() && !_designTime)
             // SQLite does not have proper support for DateTimeOffset via Entity Framework Core, see the limitations
             // here: https://docs.microsoft.com/en-us/ef/core/providers/sqlite/limitations#query-limitations
