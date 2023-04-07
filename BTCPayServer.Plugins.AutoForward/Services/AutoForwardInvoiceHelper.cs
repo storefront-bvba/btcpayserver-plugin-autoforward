@@ -135,13 +135,13 @@ public class AutoForwardInvoiceHelper
         }
     }
 
-    public async Task<PayoutData> GetPayoutForDestination(string paymentMethod, string destination, string storeId, CancellationToken cancellationToken)
+    public async Task<PayoutData> GetPayoutForDestination(string cryptoCode, string destination, string storeId, CancellationToken cancellationToken)
     {
         var client = await _btcPayServerClientFactory.Create(null, storeId);
         var payouts = await client.GetStorePayouts(storeId, false, cancellationToken);
         foreach (var onePayout in payouts)
         {
-            if (onePayout.Destination.Equals(destination) && onePayout.PaymentMethod.Equals(paymentMethod))
+            if (onePayout.Destination.Equals(destination) && onePayout.CryptoCode.Equals(cryptoCode))
             {
                 return onePayout;
             }
@@ -153,7 +153,8 @@ public class AutoForwardInvoiceHelper
     private async Task CreateOrUpdatePayout(string paymentMethod, string destination, string storeId, CancellationToken cancellationToken)
     {
         var client = await _btcPayServerClientFactory.Create(null, new string[] { storeId });
-        PayoutData payout = await GetPayoutForDestination(paymentMethod, destination, storeId, cancellationToken);
+        var cryptoCode = paymentMethod.Split("-")[0];
+        PayoutData payout = await GetPayoutForDestination(cryptoCode, destination, storeId, cancellationToken);
         List<InvoiceEntity> invoicesIncludedInPayout = new();
 
         var invoices = await GetUnprocessedInvoicesLinkedToDestination(destination, storeId);
@@ -182,7 +183,7 @@ public class AutoForwardInvoiceHelper
 
             foreach (var invoice in invoices)
             {
-                await WriteToLog(invoice.Id, $"Cancelled previous Payout ID {payout.Id} because the amount should be {totalAmount} instead of {payout.Amount}");
+                await WriteToLog($"Cancelled previous Payout ID {payout.Id} because the amount should be {totalAmount} instead of {payout.Amount}", invoice.Id);
             }
         }
 
@@ -212,7 +213,7 @@ public class AutoForwardInvoiceHelper
 
         foreach (var invoice in invoices)
         {
-            await WriteToLog(invoice.Id, $"Created new Payout ID {payout.Id} for {totalAmount} containing the payouts for invoices {invoiceText}.");
+            await WriteToLog($"Created new Payout ID {payout.Id} for {totalAmount} containing the payouts for invoices {invoiceText}.", invoice.Id);
         }
     }
 

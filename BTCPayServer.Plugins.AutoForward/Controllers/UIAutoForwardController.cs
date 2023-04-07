@@ -106,6 +106,7 @@ public class UIAutoForwardController : Controller
         };
 
         string paymentMethod = "BTC-OnChain"; // TODO make dynamic
+        string cryptoCode = paymentMethod.Split("-")[0];
 
         // invoiceQuery.StoreId = model.StoreIds;
         invoiceQuery.Take = model.Count;
@@ -132,7 +133,7 @@ public class UIAutoForwardController : Controller
             }
             else
             {
-                payout = await _helper.GetPayoutForDestination(paymentMethod, meta.AutoForwardToAddress, invoice.StoreId, cancellationToken);
+                payout = await _helper.GetPayoutForDestination(cryptoCode, meta.AutoForwardToAddress, invoice.StoreId, cancellationToken);
             }
             
             model.Invoices.Add(new AutoForwardableInvoiceModel()
