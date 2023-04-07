@@ -18,12 +18,12 @@
         @ViewData["Title"]
     </h2>
     <nav id="SectionNav">
-            <div class="nav">
-                <a id="SectionNav-@AutoForwardNavPages.Invoices" class="nav-link @ViewData.IsActivePage(AutoForwardNavPages.Invoices)" asp-action="Index">Auto-Forwardable Invoices</a>
-                <a id="SectionNav-@AutoForwardNavPages.Payouts" class="nav-link @ViewData.IsActivePage(AutoForwardNavPages.Payouts)" asp-action="Payouts">Payouts</a>
-            </div>
-        </nav>
-    
+        <div class="nav">
+            <a id="SectionNav-@AutoForwardNavPages.Invoices" class="nav-link @ViewData.IsActivePage(AutoForwardNavPages.Invoices)" asp-action="Index">Auto-Forwardable Invoices</a>
+            <a id="SectionNav-@AutoForwardNavPages.Payouts" class="nav-link @ViewData.IsActivePage(AutoForwardNavPages.Payouts)" asp-action="Payouts">Payouts</a>
+        </div>
+    </nav>
+
     @* 
     TODO add support to manually create an auto-forwardable invoice?
     <a id="CreateNewInvoice" asp-action="CreateInvoice" asp-route-storeId="@Model.StoreId" asp-route-searchTerm="@Model.SearchTerm" class="btn btn-primary mt-3 mt-sm-0"> *@
@@ -52,6 +52,12 @@
 </pre>
 
 
+
+<h1>
+    TODO: When payouts are processed, need to save the Payout ID on the invoices so they are considered paid out!
+</h1>
+
+
 <h2>Invoices</h2>
 <div class="table-responsive">
     <table id="invoices" class="table table-hover">
@@ -65,9 +71,9 @@
             <th class="text-nowrap">Invoice Status</th>
             <th class="text-nowrap text-end">Amount invoiced</th>
             <th class="text-nowrap text-end">Amount received</th>
-            <th class="text-nowrap text-end">Amount forwarded</th>
-            <th class="text-nowrap">Forwarding Status</th>
-            <th class="text-nowrap">Payout</th>
+            <th class="text-nowrap text-end">Amount to forward</th>
+            <th class="text-nowrap">Payout Status</th>
+            <th class="text-nowrap">Payout ID</th>
         </tr>
         </thead>
         <tbody>
@@ -102,6 +108,10 @@
                         }
                     </span>
 
+                    <span class="badge badge-@invoice.Status.Status.ToModernStatus().ToString().ToLower()">
+                        @invoice.Status.Status.ToString()
+                    </span>
+
                     @foreach (var paymentType in invoice.Payments.Select(payment => payment.GetPaymentMethodId()?.PaymentType).Distinct().Where(type => type != null && !string.IsNullOrEmpty(type.GetBadge())))
                     {
                         <span class="badge">@paymentType.GetBadge()</span>
@@ -116,21 +126,26 @@
                 <td class="text-end text-nowrap">@DisplayFormatter.Currency(invoice.Amount, invoice.Currency)</td>
 
                 <td class="text-end">
-                    @DisplayFormatter.Currency(invoice.AmountReceived.ToDecimal(MoneyUnit.BTC), invoice.AmountReceivedCryptoCode)
+                    @if (invoice.AmountReceived.ToDecimal(MoneyUnit.BTC) > 0)
+                    {
+                        @DisplayFormatter.Currency(invoice.AmountReceived.ToDecimal(MoneyUnit.BTC), invoice.AmountReceivedCryptoCode)
+                    }
                 </td>
 
-                <!-- Amount forwarded -->
+                <!-- Amount to forward -->
                 <td class="text-end">
-
+                    @if (invoice.AmountReceived.ToDecimal(MoneyUnit.BTC) > 0)
+                    {
+                        @(invoice.AutoForwardPercentage * invoice.AmountReceived.ToDecimal(MoneyUnit.BTC))
+                    }
                 </td>
 
-                <!-- Forwarding status -->
+                <!-- Payout status -->
                 <td>
-
+                    @invoice.AutoForwardPayout?.State
                 </td>
-
-                <td></td>
-                <td></td>
+                
+                <!-- Payout ID -->
                 <td>
                     @invoice.AutoForwardPayout?.Id
                 </td>
@@ -141,7 +156,6 @@
 </div>
 
 <vc:pager view-model="Model"/>
-
 
 
 @* <h2>Totals</h2> *@

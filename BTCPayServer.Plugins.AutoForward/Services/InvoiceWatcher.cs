@@ -1,6 +1,5 @@
 using System.Threading;
 using System.Threading.Tasks;
-using BTCPayServer.Client.Models;
 using BTCPayServer.Events;
 using BTCPayServer.HostedServices;
 using BTCPayServer.Logging;
@@ -33,9 +32,8 @@ public class InvoiceWatcher : EventHostedServiceBase
         if (evt is InvoiceEvent invoiceEvent)
         {
             InvoiceEntity invoice = invoiceEvent.Invoice;
-            if (invoice.Status.ToModernStatus() == InvoiceStatus.Settled)
+            if (_autoForwardInvoiceHelper.CanInvoiceBePaidOut(invoice))
             {
-                // An invoice was just settled
                 _autoForwardInvoiceHelper.SyncPayoutForInvoice(invoice, cancellationToken);
             }
         }

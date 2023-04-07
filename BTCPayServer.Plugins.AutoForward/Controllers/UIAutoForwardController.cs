@@ -125,13 +125,13 @@ public class UIAutoForwardController : Controller
             var amountReceived = AutoForwardInvoiceHelper.GetAmountReceived(invoice, pm);
             var payments = invoice.GetPayments(false);
             var hasRefund = invoice.Refunds.Any(data => !data.PullPaymentData.Archived);
-            Client.Models.PayoutData payout;
+            Client.Models.PayoutData payout = null;
             
             if (meta.AutoForwardCompletedPayoutId != null)
             {
                 payout = await _helper.GetPayoutById(meta.AutoForwardCompletedPayoutId, invoice.StoreId, cancellationToken);
             }
-            else
+            else if(_helper.CanInvoiceBePaidOut(invoice))
             {
                 payout = await _helper.GetPayoutForDestination(cryptoCode, meta.AutoForwardToAddress, invoice.StoreId, cancellationToken);
             }
@@ -183,6 +183,7 @@ public class AutoForwardableInvoiceModel
     
     public string AutoForwardToAddress { get; set; }
     public decimal AutoForwardPercentage { get; set; }
+    public decimal AutoForwardAmount{ get; set; }
     public Client.Models.PayoutData AutoForwardPayout { get; set; }
 
     public InvoiceState Status { get; set; }

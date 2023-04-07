@@ -122,9 +122,9 @@ public class AutoForwardInvoiceHelper
      */
     public async void SyncPayoutForInvoice(InvoiceEntity invoice, CancellationToken cancellationToken)
     {
-        if (invoice.Status.ToModernStatus() != InvoiceStatus.Settled)
+        if (!CanInvoiceBePaidOut(invoice))
         {
-            throw new Exception($"Invoice ID {invoice.Id} should be settled. Cannot create or update payout for this invoice.");
+            throw new Exception($"Invoice ID {invoice.Id} should be completed. Cannot sync payout for this invoice.");
         }
 
         var metaJson = invoice.Metadata.ToJObject();
@@ -145,7 +145,7 @@ public class AutoForwardInvoiceHelper
         var payouts = await client.GetStorePayouts(storeId, false, cancellationToken);
         foreach (var onePayout in payouts)
         {
-            if (onePayout.Destination.Equals(destination) && onePayout.CryptoCode.Equals(cryptoCode))
+            if (onePayout.Destination.Equals(destination) && onePayout.CryptoCode.Equals(cryptoCode) && onePayout.State != PayoutState.Completed)
             {
                 return onePayout;
             }
@@ -195,7 +195,7 @@ public class AutoForwardInvoiceHelper
         {
             // Create a new payout for the correct amount
             payout = await CreatePayout(destination, totalAmount, paymentMethod, storeId, cancellationToken);
-            
+
             string invoiceText = "";
             for (int i = 0; i < invoicesIncludedInPayout.Count; i++)
             {
@@ -221,13 +221,11 @@ public class AutoForwardInvoiceHelper
             {
                 await WriteToLog($"Created new Payout ID {payout.Id} for {totalAmount} {cryptoCode} containing the payouts for invoices {invoiceText}.", invoice.Id);
             }
-            
         }
         catch (GreenfieldAPIException e)
         {
             if (e.APIError.Code.Equals("duplicate-destination"))
             {
-                
                 var existingPayout = await GetPayoutForDestination(cryptoCode, destination, storeId, cancellationToken);
 
                 if (existingPayout.Amount.Equals(totalAmount))
@@ -239,7 +237,7 @@ public class AutoForwardInvoiceHelper
                 {
                     // The amount does not match. This is serious!
                     _logger.LogError("Could not create payout to {Destination} for {TotalAmount} {CryptoCode}. One already exists, but this was not expected.", destination, totalAmount, cryptoCode);
-                    
+
                     // TODO should we throw?
                     //throw;
                 }
@@ -251,8 +249,6 @@ public class AutoForwardInvoiceHelper
                 throw;
             }
         }
-
-        
     }
 
     private async Task WriteToLog(string message, string invoiceId)
@@ -273,5 +269,9 @@ public class AutoForwardInvoiceHelper
         return payout;
     }
 
- 
+
+    public bool CanInvoiceBePaidOut(InvoiceEntity invoice)
+    {
+        return invoice.Status == InvoiceStatusLegacy.Complete;
+    }
 }
