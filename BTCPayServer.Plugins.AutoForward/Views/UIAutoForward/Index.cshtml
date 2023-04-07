@@ -66,7 +66,7 @@ curl -v --header "Authorization: token YOUR_API_KEY_COMES_HERE" --data '{amount:
             <th class="text-nowrap text-end">Amount invoiced</th>
             <th class="text-nowrap text-end">Amount received</th>
             <th class="text-nowrap text-end">Amount forwarded</th>
-            <th class="text-nowrap">Payout ID</th>
+            <th class="text-nowrap">Payout</th>
             <th class="text-nowrap">Forwarding Status</th>
         </tr>
         </thead>
@@ -133,7 +133,7 @@ curl -v --header "Authorization: token YOUR_API_KEY_COMES_HERE" --data '{amount:
                 <td></td>
                 <td></td>
                 <td>
-                    @invoice.AutoForwardPayoutId
+                    @invoice.AutoForwardPayout?.Id
                 </td>
                 <td></td>
             </tr>

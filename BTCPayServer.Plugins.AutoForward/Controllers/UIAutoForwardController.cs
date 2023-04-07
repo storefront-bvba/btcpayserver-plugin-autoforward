@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Client;
@@ -83,7 +84,7 @@ public class UIAutoForwardController : Controller
 
 
     [Route("~/plugins/autoforward")]
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(CancellationToken cancellationToken = default)
     {
         var model = new PluginPageViewModel { Data = await _PluginService.Get() };
 
@@ -108,13 +109,15 @@ public class UIAutoForwardController : Controller
             //StoreId = storeId,
         };
 
+        string paymentMethod = "BTC-OnChain"; // TODO make dynamic
+
         // invoiceQuery.StoreId = model.StoreIds;
         invoiceQuery.Take = model.Count;
         invoiceQuery.Skip = model.Skip;
         invoiceQuery.IncludeRefunds = true;
 
         //var list = await _InvoiceRepository.GetInvoices(invoiceQuery);
-        var list = await _helper.getAutoForwardableInvoices();
+        var list = await _helper.GetAutoForwardableInvoices();
 
         foreach (var invoice in list)
         {
@@ -122,9 +125,19 @@ public class UIAutoForwardController : Controller
             var state = invoice.GetInvoiceState();
             var pm = "BTC-OnChain"; // TODO make dynamic
 
-            var amountReceived = AutoForwardInvoiceHelper.getAmountReceived(invoice, pm);
+            var amountReceived = AutoForwardInvoiceHelper.GetAmountReceived(invoice, pm);
             var payments = invoice.GetPayments(false);
             var hasRefund = invoice.Refunds.Any(data => !data.PullPaymentData.Archived);
+            Client.Models.PayoutData payout;
+            
+            if (meta.AutoForwardCompletedPayoutId != null)
+            {
+                payout = await _helper.GetPayoutById(meta.AutoForwardCompletedPayoutId, invoice.StoreId, cancellationToken);
+            }
+            else
+            {
+                payout = await _helper.GetPayoutForDestination(paymentMethod, meta.AutoForwardToAddress, invoice.StoreId, cancellationToken);
+            }
             
             model.Invoices.Add(new AutoForwardableInvoiceModel()
             {
@@ -137,7 +150,7 @@ public class UIAutoForwardController : Controller
                 HasRefund = hasRefund, // TODO do something with refund info?
                 Payments = payments,
                 AutoForwardToAddress = meta.AutoForwardToAddress,
-                AutoForwardPayoutId = meta.AutoForwardPayoutId,
+                AutoForwardPayout = payout,
                 AutoForwardPercentage = meta.AutoForwardPercentage,
                 AmountReceived = amountReceived,
                 AmountReceivedCryptoCode = "BTC" // TODO make dynamic
@@ -173,7 +186,7 @@ public class AutoForwardableInvoiceModel
     
     public string AutoForwardToAddress { get; set; }
     public decimal AutoForwardPercentage { get; set; }
-    public string AutoForwardPayoutId { get; set; }
+    public Client.Models.PayoutData AutoForwardPayout { get; set; }
 
     public InvoiceState Status { get; set; }
     public decimal Amount { get; set; }
