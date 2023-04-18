@@ -2,24 +2,23 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using BTCPayServer.Plugins.AutoForward.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace BTCPayServer.Plugins.AutoForward.Data;
 
-public class MyPluginDbContext : DbContext
+public class AutoForwardDbContext : DbContext
 {
     private readonly bool _designTime;
 
-    public MyPluginDbContext(DbContextOptions<MyPluginDbContext> options, bool designTime = false)
+    public AutoForwardDbContext(DbContextOptions<AutoForwardDbContext> options, bool designTime = false)
         : base(options)
     {
         _designTime = designTime;
     }
 
-    public DbSet<PluginData> PluginRecords { get; set; }
+    public DbSet<AutoForwardDestination> AutoForwardDestination { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

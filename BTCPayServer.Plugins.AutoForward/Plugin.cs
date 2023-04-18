@@ -11,22 +11,21 @@ public class Plugin : BaseBTCPayServerPlugin
 {
     public override IBTCPayServerPlugin.PluginDependency[] Dependencies { get; } = new[]
     {
-        new IBTCPayServerPlugin.PluginDependency { Identifier = nameof(BTCPayServer), Condition = ">=1.8.2" }
+        new IBTCPayServerPlugin.PluginDependency { Identifier = nameof(BTCPayServer), Condition = ">=1.9.0" }
     };
 
     public override void Execute(IServiceCollection services)
     {
         services.AddSingleton<IUIExtension>(new UIExtension("TemplatePluginHeaderNav", "header-nav"));
         services.AddHostedService<ApplicationPartsLogger>();
-        // services.AddHostedService<PayoutUpdater>();
         services.AddHostedService<PluginMigrationRunner>();
-        services.AddSingleton<MyPluginService>();
-        services.AddSingleton<MyPluginDbContextFactory>();
+        services.AddSingleton<AutoForwardDbContextFactory>();
         services.AddSingleton<AutoForwardInvoiceHelper>();
+        services.AddSingleton<AutoForwardDestinationRepository>();
         services.AddHostedService<InvoiceWatcher>();
-        services.AddDbContext<MyPluginDbContext>((provider, o) =>
+        services.AddDbContext<AutoForwardDbContext>((provider, o) =>
         {
-            MyPluginDbContextFactory factory = provider.GetRequiredService<MyPluginDbContextFactory>();
+            AutoForwardDbContextFactory factory = provider.GetRequiredService<AutoForwardDbContextFactory>();
             factory.ConfigureBuilder(o);
         });
     }

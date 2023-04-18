@@ -33,7 +33,7 @@
   </ItemGroup>
 
   
-  <!-- The following fragment is needed for EF Migrations. Uncomment to run "dotnet ef xxx" commands, but do not keep this in the project afterwards. 
+  <!-- The following fragment is needed for EF Migrations. Uncomment to run "dotnet ef xxx" commands, but do not keep this in the project afterwards. --> 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="6.0.9">
@@ -45,6 +45,6 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="6.0.9" />
   </ItemGroup>
-  -->
+  
   
 </Project>

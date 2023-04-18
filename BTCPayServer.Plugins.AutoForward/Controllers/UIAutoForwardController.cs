@@ -21,18 +21,12 @@ namespace BTCPayServer.Plugins.AutoForward.Controllers;
 [Authorize(AuthenticationSchemes = AuthenticationSchemes.Cookie, Policy = Policies.CanViewProfile)]
 public class UIAutoForwardController : Controller
 {
-    private readonly MyPluginService _pluginService;
     private readonly UserManager<ApplicationUser> _userManager;
-    private readonly InvoiceRepository _invoiceRepository;
-    private readonly DisplayFormatter _displayFormatter;
     private readonly AutoForwardInvoiceHelper _helper;
 
-    public UIAutoForwardController(MyPluginService pluginService, UserManager<ApplicationUser> userManager, InvoiceRepository invoiceRepository, DisplayFormatter displayFormatter, AutoForwardInvoiceHelper helper)
+    public UIAutoForwardController( UserManager<ApplicationUser> userManager, InvoiceRepository invoiceRepository, DisplayFormatter displayFormatter, AutoForwardInvoiceHelper helper)
     {
-        _pluginService = pluginService;
         _userManager = userManager;
-        _invoiceRepository = invoiceRepository;
-        _displayFormatter = displayFormatter;
         _helper = helper;
     }
 
@@ -83,7 +77,7 @@ public class UIAutoForwardController : Controller
     [Route("~/plugins/autoforward")]
     public async Task<IActionResult> Index(CancellationToken cancellationToken = default)
     {
-        var model = new PluginPageViewModel { Data = await _pluginService.Get() };
+        var model = new PluginPageViewModel { };
 
 // TODO Cleanup
         // var storeIds = new HashSet<string>();
@@ -159,17 +153,17 @@ public class UIAutoForwardController : Controller
     }
 
     [Route("~/plugins/autoforward/payouts")]
-    public async Task<IActionResult> Payouts()
+    public Task<IActionResult> Payouts()
     {
-        var model = new PluginPageViewModel { Data = await _pluginService.Get() };
-        return View(model);
+        var model = new PluginPageViewModel {  };
+        return Task.FromResult<IActionResult>(View(model));
     }
 
 }
 
 public class PluginPageViewModel : BasePagingViewModel
 {
-    public List<PluginData> Data { get; set; }
+    
     public List<AutoForwardableInvoiceModel> Invoices { get; set; } = new();
     public override int CurrentPageCount => Invoices.Count;
 }

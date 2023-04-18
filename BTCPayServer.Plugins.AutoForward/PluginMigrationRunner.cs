@@ -9,25 +9,25 @@ namespace BTCPayServer.Plugins.AutoForward;
 
 public class PluginMigrationRunner : IHostedService
 {
-    private readonly MyPluginDbContextFactory _PluginDbContextFactory;
-    private readonly MyPluginService _PluginService;
+    private readonly AutoForwardDbContextFactory _pluginDbContextFactory;
     private readonly ISettingsRepository _settingsRepository;
+    private readonly AutoForwardInvoiceHelper _autoForwardInvoiceHelper;
 
     public PluginMigrationRunner(
         ISettingsRepository settingsRepository,
-        MyPluginDbContextFactory PluginDbContextFactory,
-        MyPluginService PluginService)
+        AutoForwardDbContextFactory pluginDbContextFactory,
+        AutoForwardInvoiceHelper autoForwardInvoiceHelper)
     {
         _settingsRepository = settingsRepository;
-        _PluginDbContextFactory = PluginDbContextFactory;
-        _PluginService = PluginService;
+        _pluginDbContextFactory = pluginDbContextFactory;
+        _autoForwardInvoiceHelper = autoForwardInvoiceHelper;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         PluginDataMigrationHistory settings = await _settingsRepository.GetSettingAsync<PluginDataMigrationHistory>() ??
                                               new PluginDataMigrationHistory();
-        await using var ctx = _PluginDbContextFactory.CreateContext();
+        await using var ctx = _pluginDbContextFactory.CreateContext();
         await ctx.Database.MigrateAsync(cancellationToken);
 
         // settings migrations
@@ -36,9 +36,6 @@ public class PluginMigrationRunner : IHostedService
             settings.UpdatedSomething = true;
             await _settingsRepository.UpdateSetting(settings);
         }
-
-        // test record
-        await _PluginService.AddTestDataRecord();
     }
 
     public Task StopAsync(CancellationToken cancellationToken)

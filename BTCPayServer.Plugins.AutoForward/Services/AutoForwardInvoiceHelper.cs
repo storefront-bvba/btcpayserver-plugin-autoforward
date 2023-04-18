@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Data.Common;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,6 +24,7 @@ public class AutoForwardInvoiceHelper
     private readonly InvoiceRepository _invoiceRepository;
     private readonly IBTCPayServerClientFactory _btcPayServerClientFactory;
     private readonly ILogger _logger;
+    
 
     public AutoForwardInvoiceHelper(ApplicationDbContextFactory applicationDbContextFactory, InvoiceRepository invoiceRepository, IBTCPayServerClientFactory btcPayServerClientFactory, ILoggerFactory loggerFactory)
     {
@@ -124,7 +124,7 @@ public class AutoForwardInvoiceHelper
     {
         if (!CanInvoiceBePaidOut(invoice))
         {
-            throw new Exception($"Invoice ID {invoice.Id} should be completed. Cannot sync payout for this invoice.");
+            throw new System.Exception($"Invoice ID {invoice.Id} should be completed. Cannot sync payout for this invoice.");
         }
 
         var metaJson = invoice.Metadata.ToJObject();
@@ -274,4 +274,6 @@ public class AutoForwardInvoiceHelper
     {
         return invoice.Status == InvoiceStatusLegacy.Complete;
     }
+
+
 }
