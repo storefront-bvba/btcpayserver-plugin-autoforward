@@ -23,11 +23,13 @@ public class UIAutoForwardController : Controller
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly AutoForwardInvoiceHelper _helper;
+    private readonly AutoForwardDestinationRepository _autoForwardDestinationRepository;
 
-    public UIAutoForwardController( UserManager<ApplicationUser> userManager, InvoiceRepository invoiceRepository, DisplayFormatter displayFormatter, AutoForwardInvoiceHelper helper)
+    public UIAutoForwardController( UserManager<ApplicationUser> userManager, AutoForwardDestinationRepository autoForwardDestinationRepository, DisplayFormatter displayFormatter, AutoForwardInvoiceHelper helper)
     {
         _userManager = userManager;
         _helper = helper;
+        _autoForwardDestinationRepository = autoForwardDestinationRepository;
     }
 
     private string GetUserId() => _userManager.GetUserId(User);
@@ -77,7 +79,7 @@ public class UIAutoForwardController : Controller
     [Route("~/plugins/autoforward")]
     public async Task<IActionResult> Index(CancellationToken cancellationToken = default)
     {
-        var model = new PluginPageViewModel { };
+        var model = new InvoicesViewModel { };
 
 // TODO Cleanup
         // var storeIds = new HashSet<string>();
@@ -155,17 +157,32 @@ public class UIAutoForwardController : Controller
     [Route("~/plugins/autoforward/payouts")]
     public Task<IActionResult> Payouts()
     {
-        var model = new PluginPageViewModel {  };
+        var model = new InvoicesViewModel {  };
         return Task.FromResult<IActionResult>(View(model));
     }
 
+    [Route("~/plugins/autoforward/destinations")]
+    public async Task<IActionResult> Destinations(CancellationToken cancellationToken)
+    {
+        var model = new DestinationsViewModel {  };
+        model.Destinations = await _autoForwardDestinationRepository.FindAll(cancellationToken);
+        return await Task.FromResult<IActionResult>(View(model));
+    }
+    
 }
 
-public class PluginPageViewModel : BasePagingViewModel
+public class InvoicesViewModel : BasePagingViewModel
 {
     
     public List<AutoForwardableInvoiceModel> Invoices { get; set; } = new();
     public override int CurrentPageCount => Invoices.Count;
+}
+
+public class DestinationsViewModel : BasePagingViewModel
+{
+    
+    public AutoForwardDestination[] Destinations { get; set; }
+    public override int CurrentPageCount => Destinations.Length;
 }
 
 public class AutoForwardableInvoiceModel

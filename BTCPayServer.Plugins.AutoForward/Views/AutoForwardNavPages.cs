@@ -2,5 +2,7 @@ namespace BTCPayServer.Plugins.AutoForward.Views;
 
 public enum AutoForwardNavPages
 {
-    Invoices,Payouts
+    Invoices,
+    Payouts,
+    Destinations
 }

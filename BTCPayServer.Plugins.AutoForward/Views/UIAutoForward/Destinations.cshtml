@@ -1,0 +1,96 @@
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Components
+@using BTCPayServer.Plugins.AutoForward.Views
+@using BTCPayServer.Services
+@using Microsoft.AspNetCore.Mvc.TagHelpers
+@inject DisplayFormatter DisplayFormatter
+@model BTCPayServer.Plugins.AutoForward.Controllers.DestinationsViewModel
+@{
+    ViewData.SetActivePage(PluginNavPages.Index, "Auto-Forward Destinations");
+}
+
+<div class="sticky-header-setup"></div>
+<div class="sticky-header mb-l">
+    <h2 class="mt-1 mb-2 mb-lg-4">
+        @ViewData["Title"]
+    </h2>
+    <nav id="SectionNav">
+        <div class="nav">
+            <a id="SectionNav-@AutoForwardNavPages.Invoices" class="nav-link @ViewData.IsActivePage(AutoForwardNavPages.Invoices)" asp-action="Index">Invoices</a>
+            <a id="SectionNav-@AutoForwardNavPages.Destinations" class="nav-link active @ViewData.IsActivePage(AutoForwardNavPages.Destinations)" asp-action="Index">Destinations</a>
+            <!--
+            <a id="SectionNav-@AutoForwardNavPages.Payouts" class="nav-link @ViewData.IsActivePage(AutoForwardNavPages.Payouts)" asp-action="Payouts">Payouts</a>
+            -->
+        </div>
+    </nav>
+</div>
+
+<p>This page shows all destinations for auto-forwarding.</p>
+<p>Creating these destinations is currently only possible using the Greenfield API. For example:</p>
+<pre>
+    <code>
+    curl -v --header "Authorization: token YOUR_API_KEY_GOES_HERE" --data '{destination: "BITCOIN_ADDRESS_GOES_HERE", paymentMethod: "BTC-OnChain" }' --header "Content-Type: application/json" http://127.0.0.1:14142/api/v1/stores/YOUR_STORE_ID_GOES_HERE/autoforward-destinations
+    </code>
+</pre>
+
+<h2>Destinations</h2>
+<div class="table-responsive">
+    <table id="destinations" class="table table-hover">
+        <thead>
+        <tr>
+            <th class="text-nowrap">Destination Address</th>
+            <th class="text-nowrap">Payouts</th>
+            <th class="text-nowrap text-end">Balance</th>
+            <th class="text-nowrap">Store ID</th>
+            <th class="text-nowrap">Payment Method</th>
+        </tr>
+        </thead>
+        <tbody>
+        @{
+            decimal totalBalance = 0;
+        }
+        @foreach (var destination in Model.Destinations)
+        {
+            totalBalance += destination.Balance;
+
+            <tr id="destination_@destination.Id" class="destination-row">
+                <td class="text-nowrap">
+                    @destination.Destination
+                </td>
+                <td>
+                    @if (destination.PayoutsAllowed)
+                    {
+                        <span class="badge bg-success">Allowed</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-danger">Blocked</span>
+                    }
+                </td>
+                <td class="text-end text-nowrap">
+                    @DisplayFormatter.Currency(destination.Balance, "BTC")
+                </td>
+                <td class="text-nowrap">
+                    @destination.StoreId
+                </td>
+                <td class="text-nowrap">
+                    @destination.PaymentMethod
+                </td>
+            </tr>
+        }
+        </tbody>
+        <tfoot>
+        <tr>
+            <th>Total</th>
+            <th></th>
+            <th class="text-end text-nowrap">
+                @DisplayFormatter.Currency(totalBalance, "BTC")
+            </th>
+            <th></th>
+            <th></th>
+        </tr>
+        </tfoot>
+    </table>
+</div>
+
+<vc:pager view-model="Model"/>

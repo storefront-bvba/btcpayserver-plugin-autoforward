@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using BTCPayServer.Plugins.AutoForward.Controllers;
 using BTCPayServer.Plugins.AutoForward.Data;
 using BTCPayServer.Plugins.AutoForward.Data.Client;
 using BTCPayServer.Plugins.AutoForward.Exception;
@@ -77,5 +78,12 @@ public class AutoForwardDestinationRepository
 
         await context.SaveChangesAsync();
         return entity;
+    }
+
+    public async Task<AutoForwardDestination[]> FindAll(CancellationToken cancellationToken)
+    {
+        await using var context = _autoForwardDbContextFactory.CreateContext();
+        IQueryable<AutoForwardDestination> query = context.AutoForwardDestination.OrderBy(o => o.Destination);
+        return await query.ToArrayAsync(cancellationToken).ConfigureAwait(false);
     }
 }

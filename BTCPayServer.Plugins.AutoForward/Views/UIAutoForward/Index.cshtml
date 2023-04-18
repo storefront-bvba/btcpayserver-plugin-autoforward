@@ -7,20 +7,23 @@
 @using Microsoft.AspNetCore.Mvc.TagHelpers
 @using NBitcoin
 @inject DisplayFormatter DisplayFormatter
-@model BTCPayServer.Plugins.AutoForward.Controllers.PluginPageViewModel
+@model BTCPayServer.Plugins.AutoForward.Controllers.InvoicesViewModel
 @{
     ViewData.SetActivePage(PluginNavPages.Index, "Auto-Forward Payments");
 }
 
 <div class="sticky-header-setup"></div>
-<div class="sticky-header d-sm-flex align-items-center justify-content-between">
-    <h2 class="mb-0">
+<div class="sticky-header mb-l">
+    <h2 class="mt-1 mb-2 mb-lg-4">
         @ViewData["Title"]
     </h2>
     <nav id="SectionNav">
         <div class="nav">
-            <a id="SectionNav-@AutoForwardNavPages.Invoices" class="nav-link @ViewData.IsActivePage(AutoForwardNavPages.Invoices)" asp-action="Index">Auto-Forwardable Invoices</a>
+            <a id="SectionNav-@AutoForwardNavPages.Invoices" class="nav-link active @ViewData.IsActivePage(AutoForwardNavPages.Invoices)" asp-action="Index">Invoices</a>
+            <a id="SectionNav-@AutoForwardNavPages.Destinations" class="nav-link @ViewData.IsActivePage(AutoForwardNavPages.Destinations)" asp-action="Destinations">Destinations</a>
+            <!--
             <a id="SectionNav-@AutoForwardNavPages.Payouts" class="nav-link @ViewData.IsActivePage(AutoForwardNavPages.Payouts)" asp-action="Payouts">Payouts</a>
+            -->
         </div>
     </nav>
 
@@ -47,10 +50,9 @@
 <p>Creating these invoices is currently only possible using the Greenfield API. For example:</p>
 <pre>
     <code>
-    curl -v --header "Authorization: token YOUR_API_KEY_COMES_HERE" --data '{amount: 50, metadata: { autoForwardToAddress: "abc", autoForwardPercentage: 0.99 }}' --header "Content-Type: application/json" http://127.0.0.1:14142/api/v1/stores/YOUR_STORE_ID_COMES_HERE/invoices
+    curl -v --header "Authorization: token YOUR_API_KEY_GOES_HERE" --data '{amount: 50, metadata: { autoForwardToAddress: "abc", autoForwardPercentage: 0.99 }}' --header "Content-Type: application/json" http://127.0.0.1:14142/api/v1/stores/YOUR_STORE_ID_GOES_HERE/invoices
     </code>
 </pre>
-
 
 
 <h3>TODO: When payouts are processed, need to save the Payout ID on the invoices so they are considered paid out!</h3>
@@ -76,8 +78,25 @@
         </tr>
         </thead>
         <tbody>
+        @{
+            decimal totalToForward = 0;
+            decimal totalReceived = 0;
+        }
+
         @foreach (var invoice in Model.Invoices)
         {
+            decimal amountToForward = 0;
+            decimal amountReceived = 0;
+
+            if (invoice.AmountReceived.ToDecimal(MoneyUnit.BTC) > 0)
+            {
+                amountReceived = invoice.AmountReceived.ToDecimal(MoneyUnit.BTC);
+                amountToForward = invoice.AutoForwardPercentage * totalReceived;
+
+                totalToForward += amountToForward;
+                totalReceived += amountReceived;
+            }
+
             <tr id="invoice_@invoice.InvoiceId" class="invoice-row">
                 <td>@invoice.Date.ToBrowserDate()</td>
                 <td class="text-break">
@@ -133,9 +152,9 @@
 
                 <!-- Amount to forward -->
                 <td class="text-end">
-                    @if (invoice.AmountReceived.ToDecimal(MoneyUnit.BTC) > 0)
+                    @if (amountToForward > 0)
                     {
-                        @(invoice.AutoForwardPercentage * invoice.AmountReceived.ToDecimal(MoneyUnit.BTC))
+                        @DisplayFormatter.Currency((decimal)amountToForward, invoice.AmountReceivedCryptoCode)
                     }
                 </td>
 
@@ -143,7 +162,7 @@
                 <td>
                     @invoice.AutoForwardPayout?.State
                 </td>
-                
+
                 <!-- Payout ID -->
                 <td>
                     @invoice.AutoForwardPayout?.Id
@@ -151,6 +170,26 @@
             </tr>
         }
         </tbody>
+        <tfoot>
+        <tr>
+            <th>
+                Total
+            </th>
+            <th></th>
+            <th></th>
+            <th></th>
+            <th></th>
+            <th></th>
+            <th></th>
+            <th class="text-end text-nowrap">
+                @DisplayFormatter.Currency(totalReceived, "BTC")
+            </th>
+            <th class="text-end text-nowrap">
+                @DisplayFormatter.Currency(totalToForward, "BTC")
+            </th>
+
+        </tr>
+        </tfoot>
     </table>
 </div>
 
