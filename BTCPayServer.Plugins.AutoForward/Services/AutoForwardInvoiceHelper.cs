@@ -98,14 +98,14 @@ public class AutoForwardInvoiceHelper
     // }
 
 
-    private async Task<PayoutData> CreatePayout(string destinationAddress, decimal amount, string paymentMethod, string storeId, CancellationToken cancellationToken)
+    private async Task<PayoutData> CreatePayout(string destinationAddress, decimal amount, string paymentMethod, string storeId, bool subtractFromAmount, CancellationToken cancellationToken)
     {
         var client = await _btcPayServerClientFactory.Create(null, new string[] { storeId });
         CreateOnChainTransactionRequest createOnChainTransactionRequest = new CreateOnChainTransactionRequest();
         createOnChainTransactionRequest.ProceedWithBroadcast = false;
         var destination = new CreateOnChainTransactionRequest.CreateOnChainTransactionRequestDestination
         {
-            Destination = destinationAddress, Amount = amount, SubtractFromAmount = false
+            Destination = destinationAddress, Amount = amount, SubtractFromAmount = subtractFromAmount
         };
         createOnChainTransactionRequest.Destinations = new List<CreateOnChainTransactionRequest.CreateOnChainTransactionRequestDestination>();
         createOnChainTransactionRequest.Destinations.Add(destination);
@@ -131,11 +131,27 @@ public class AutoForwardInvoiceHelper
         AutoForwardInvoiceMetadata newMeta = AutoForwardInvoiceMetadata.FromJObject(metaJson);
         var paymentMethod = "BTC-OnChain"; // TODO make dynamic
 
-        if (string.IsNullOrEmpty(newMeta.AutoForwardCompletedPayoutId))
+        if (!String.IsNullOrEmpty(newMeta.AutoForwardPayoutId))
+        {
+            var payout = await GetPayoutById(newMeta.AutoForwardPayoutId, invoice.StoreId, cancellationToken);
+            if (payout != null)
+            {
+                // The invoice is already linked to a payout. It is possible the payout was just completed, but the invoice doesn't know about it.
+                if (payout.State == PayoutState.Completed)
+                {
+                    newMeta.AutoForwardCompleted = true;
+                    invoice.Metadata = newMeta;
+                    await _invoiceRepository.UpdateInvoiceMetadata(invoice.Id, invoice.StoreId, newMeta.ToJObject());
+                }
+            }
+        }
+
+        if (!newMeta.AutoForwardCompleted)
         {
             // This invoice was not paid out yet
             var destination = newMeta.AutoForwardToAddress;
-            await CreateOrUpdatePayout(paymentMethod, destination, invoice.StoreId, cancellationToken);
+            bool subtractFromAmount = newMeta.AutoForwardSubtractFeeFromAmount;
+            await CreateOrUpdatePayout(paymentMethod, destination, invoice.StoreId, subtractFromAmount, cancellationToken);
         }
     }
 
@@ -154,7 +170,7 @@ public class AutoForwardInvoiceHelper
         return null;
     }
 
-    private async Task CreateOrUpdatePayout(string paymentMethod, string destination, string storeId, CancellationToken cancellationToken)
+    private async Task CreateOrUpdatePayout(string paymentMethod, string destination, string storeId, bool subtractFromAmount, CancellationToken cancellationToken)
     {
         var client = await _btcPayServerClientFactory.Create(null, new string[] { storeId });
         var cryptoCode = paymentMethod.Split("-")[0];
@@ -176,6 +192,7 @@ public class AutoForwardInvoiceHelper
 
         if (payout != null)
         {
+            // TODO maybe "subtractFromAmount" is different now, and we should still cancel? Where is this stored in the payout?
             if (payout.Amount.Equals(totalAmount))
             {
                 // The existing payout is correct. No need to change anything.
@@ -194,7 +211,7 @@ public class AutoForwardInvoiceHelper
         try
         {
             // Create a new payout for the correct amount
-            payout = await CreatePayout(destination, totalAmount, paymentMethod, storeId, cancellationToken);
+            payout = await CreatePayout(destination, totalAmount, paymentMethod, storeId, subtractFromAmount, cancellationToken);
 
             string invoiceText = "";
             for (int i = 0; i < invoicesIncludedInPayout.Count; i++)
@@ -217,9 +234,16 @@ public class AutoForwardInvoiceHelper
                 invoiceText += invoicesIncludedInPayout[i].Id;
             }
 
-            foreach (var invoice in invoices)
+            foreach (var invoice in invoicesIncludedInPayout)
             {
                 await WriteToLog($"Created new Payout ID {payout.Id} for {totalAmount} {cryptoCode} containing the payouts for invoices {invoiceText}.", invoice.Id);
+                
+                // Link the invoice to the payout
+                var metaJson = invoice.Metadata.ToJObject();
+                AutoForwardInvoiceMetadata newMeta = AutoForwardInvoiceMetadata.FromJObject(metaJson);
+                newMeta.AutoForwardPayoutId = payout.Id;
+
+                await _invoiceRepository.UpdateInvoiceMetadata(invoice.Id, invoice.StoreId, newMeta.ToJObject());
             }
         }
         catch (GreenfieldAPIException e)

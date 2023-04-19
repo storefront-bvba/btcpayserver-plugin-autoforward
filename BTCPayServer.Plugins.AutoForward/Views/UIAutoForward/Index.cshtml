@@ -50,13 +50,13 @@
 <p>Creating these invoices is currently only possible using the Greenfield API. For example:</p>
 <pre>
     <code>
-    curl -v --header "Authorization: token YOUR_API_KEY_GOES_HERE" --data '{amount: 50, metadata: { autoForwardToAddress: "abc", autoForwardPercentage: 0.99 }}' --header "Content-Type: application/json" http://127.0.0.1:14142/api/v1/stores/YOUR_STORE_ID_GOES_HERE/invoices
+    curl -v --header "Authorization: token YOUR_API_KEY_GOES_HERE" --data '{amount: 50, metadata: { autoForwardToAddress: "abc", autoForwardPercentage: 0.99, autoForwardSubtractFeeFromAmount: true }}' --header "Content-Type: application/json" http://127.0.0.1:14142/api/v1/stores/YOUR_STORE_ID_GOES_HERE/invoices
     </code>
 </pre>
 
 
 <h3>TODO: When payouts are processed, need to save the Payout ID on the invoices so they are considered paid out!</h3>
-<h3>TODO: Test multiple forwarding destrinations</h3>
+<h3>TODO: Test multiple forwarding destinations</h3>
 <h3>TODO: Unit tests?</h3>
 
 <h2>Invoices</h2>

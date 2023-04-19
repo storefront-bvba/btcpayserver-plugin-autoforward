@@ -123,9 +123,9 @@ public class UIAutoForwardController : Controller
             var hasRefund = invoice.Refunds.Any(data => !data.PullPaymentData.Archived);
             Client.Models.PayoutData payout = null;
             
-            if (meta.AutoForwardCompletedPayoutId != null)
+            if (meta.AutoForwardPayoutId != null)
             {
-                payout = await _helper.GetPayoutById(meta.AutoForwardCompletedPayoutId, invoice.StoreId, cancellationToken);
+                payout = await _helper.GetPayoutById(meta.AutoForwardPayoutId, invoice.StoreId, cancellationToken);
             }
             else if(_helper.CanInvoiceBePaidOut(invoice))
             {

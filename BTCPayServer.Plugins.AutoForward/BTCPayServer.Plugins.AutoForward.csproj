@@ -28,6 +28,7 @@
   </ItemDefinitionGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\btcpayserver\BTCPayServer.Tests\BTCPayServer.Tests.csproj" />
     <ProjectReference Include="..\btcpayserver\BTCPayServer\BTCPayServer.csproj" />
     <EmbeddedResource Include="Resources\**" />
   </ItemGroup>
@@ -44,6 +45,9 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="6.0.9" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Tests\" />
   </ItemGroup>
   
   

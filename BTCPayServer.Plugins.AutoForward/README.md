@@ -4,6 +4,7 @@
 - Allows the creation of invoices for which the received funds will automatically be forwarded to another address.
 - The target destination address is defined on invoice creation.
 - The percentage of funds to be forwarded is defined on invoice creation.
+- On creation, you can define if the fees should be subtracted from the amount or if you pay the fees.
 - When an invoice is settled, a payout will be automatically created.
 - If there are multiple payouts to the same destination, they will be bundled in 1 payout. In this case the old payout is cancelled and a new one is created.
 - A payout processor can be used to automatically pay out the payouts every x hours (if you are using a hot wallet in your store).
@@ -17,7 +18,7 @@
 
 ### Creating an invoice
 ```shell
-curl -v --header "Authorization: token c980c2db7127c9a49729272bb3270ca3cae9be61" --data '{amount: 100, metadata: { autoForwardToAddress: "bcrt1q9q26gunpl7e0l45unnqqw9k3dzlsqeqlny3gpv", autoForwardPercentage: 0.99 }}' --header "Content-Type: application/json" http://127.0.0.1:14142/api/v1/stores/DjrJznzYcnV2DFgy7uvM4yztzQugNwhMGEzfYZjXD86j/invoices
+curl -v --header "Authorization: token c980c2db7127c9a49729272bb3270ca3cae9be61" --data '{amount: 100, metadata: { autoForwardToAddress: "bcrt1q9q26gunpl7e0l45unnqqw9k3dzlsqeqlny3gpv", autoForwardPercentage: 0.99, autoForwardSubtractFeeFromAmount: true }}' --header "Content-Type: application/json" http://127.0.0.1:14142/api/v1/stores/DjrJznzYcnV2DFgy7uvM4yztzQugNwhMGEzfYZjXD86j/invoices
 ```
 
 ### Listing all known destinations for Auto-Forwarding

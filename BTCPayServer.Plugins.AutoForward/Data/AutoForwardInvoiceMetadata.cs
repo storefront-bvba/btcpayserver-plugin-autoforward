@@ -7,10 +7,24 @@ namespace BTCPayServer.Plugins.AutoForward.Data;
 public class AutoForwardInvoiceMetadata: InvoiceMetadata
 {
     [JsonIgnore]
-    public string AutoForwardCompletedPayoutId
+    public bool AutoForwardCompleted
     {
-        get => this.GetAdditionalData<string>("autoForwardCompletedPayoutId");
-        set => this.SetAdditionalData("autoForwardCompletedPayoutId", value);
+        get => this.GetAdditionalData<bool>("autoForwardCompleted");
+        set => this.SetAdditionalData("autoForwardCompleted", value);
+    }
+    
+    [JsonIgnore]
+    public bool AutoForwardSubtractFeeFromAmount
+    {
+        get => this.GetAdditionalData<bool>("autoForwardSubtractFeeFromAmount");
+        set => this.SetAdditionalData("autoForwardSubtractFeeFromAmount", value);
+    }
+    
+    [JsonIgnore]
+    public string AutoForwardPayoutId
+    {
+        get => this.GetAdditionalData<string>("autoForwardPayoutId");
+        set => this.SetAdditionalData("autoForwardPayoutId", value);
     }
     
     [JsonIgnore]
