@@ -35,3 +35,7 @@ curl -v --header "Authorization: token c980c2db7127c9a49729272bb3270ca3cae9be61"
 ```shell
 curl -v -XPUT --header "Authorization: token c980c2db7127c9a49729272bb3270ca3cae9be61" --data '{payoutsAllowed: true }' --header "Content-Type: application/json" http://127.0.0.1:14142/api/v1/stores/DjrJznzYcnV2DFgy7uvM4yztzQugNwhMGEzfYZjXD86j/autoforward-destinations/053f71c3-4bc3-4f7e-bc4e-f1d976bf4c96
 ```
+
+
+## Unit Tests
+Since BTCPay Server Plugins don't support unit tests yet, the files in `Tests` should be symlinked to from the `BTCPayServer.Tests` project. We keep the actual files here so they stay with the plugin code, but they are never run here.
