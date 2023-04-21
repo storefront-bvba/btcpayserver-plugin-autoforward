@@ -1,7 +1,9 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+<Project Sdk="Microsoft.NET.Sdk.Razor">
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
     <LangVersion>10</LangVersion>
+    <Authors>Wouter Samaey</Authors>
+    <Copyright>Storefront.be</Copyright>
   </PropertyGroup>
 
   <!-- Plugin specific properties -->

@@ -34,6 +34,7 @@ public class InvoiceWatcher : EventHostedServiceBase
             InvoiceEntity invoice = invoiceEvent.Invoice;
             if (_autoForwardInvoiceHelper.CanInvoiceBePaidOut(invoice))
             {
+                // TODO this triggers too soon. Should only be after 6 confirmations, not after 1 or 2...
                 _autoForwardInvoiceHelper.SyncPayoutForInvoice(invoice, cancellationToken);
             }
         }
