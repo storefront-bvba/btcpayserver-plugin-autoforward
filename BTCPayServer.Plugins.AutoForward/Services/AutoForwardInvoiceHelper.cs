@@ -241,7 +241,7 @@ public class AutoForwardInvoiceHelper
 
         if (totalAmountToForward > 0)
         {
-            WriteToLog($"Creating payout to {destination} for {totalAmountToForward} {paymentMethod}");
+            WriteToLog($"Creating payout to {destination} for {totalAmountToForward} {paymentMethod}...");
             
             try
             {
@@ -249,6 +249,8 @@ public class AutoForwardInvoiceHelper
                 payout = await CreatePayout(destination, totalAmountToForward, paymentMethod, storeId,
                     subtractFromAmount,
                     cancellationToken);
+                
+                WriteToLog($"Payout created!");
 
 
                 string invoiceText = "";
@@ -321,11 +323,10 @@ public class AutoForwardInvoiceHelper
                             //throw;
                         }
                     }
-
-                    // TODO is this ok? This seams to happen a lot. Are we having race conditions?
                 }
                 else
                 {
+                    WriteToLog("Error creating payout: " + e);
                     throw;
                 }
             }
