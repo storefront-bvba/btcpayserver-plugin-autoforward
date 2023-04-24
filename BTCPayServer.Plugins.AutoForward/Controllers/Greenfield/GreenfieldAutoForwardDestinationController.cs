@@ -132,7 +132,7 @@ namespace BTCPayServer.Plugins.AutoForward.Controllers.Greenfield
                 var entity = await _autoForwardDestinationRepository.UpdatePayoutsAllowed(storeId, destinationId, (bool)request.PayoutsAllowed);
                 return Ok(ToModel(entity));
             }
-            catch (RecordNotFoundException e)
+            catch (RecordNotFoundException)
             {
                 throw new AutoForwardApiException(404, "destination-not-found", $"Destination {destinationId} could not be found in store {storeId}.");
             }

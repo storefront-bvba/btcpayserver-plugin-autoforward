@@ -104,13 +104,20 @@ public class AutoForwardInvoiceHelper
     //     }
     // }
 
+    private async Task<BTCPayServerClient> GetClient(string storeId)
+    {
+        return await _btcPayServerClientFactory.Create(null, storeId);
+    }
+
 
     private async Task<PayoutData> CreatePayout(string destinationAddress, decimal amount, string paymentMethod,
         string storeId, bool subtractFromAmount, CancellationToken cancellationToken)
     {
-        var client = await _btcPayServerClientFactory.Create(null, new string[] { storeId });
-        CreateOnChainTransactionRequest createOnChainTransactionRequest = new CreateOnChainTransactionRequest();
-        createOnChainTransactionRequest.ProceedWithBroadcast = false;
+        var client = await GetClient(storeId);
+        CreateOnChainTransactionRequest createOnChainTransactionRequest = new CreateOnChainTransactionRequest
+        {
+            ProceedWithBroadcast = false
+        };
         var destination = new CreateOnChainTransactionRequest.CreateOnChainTransactionRequestDestination
         {
             Destination = destinationAddress, Amount = amount, SubtractFromAmount = subtractFromAmount
@@ -144,10 +151,11 @@ public class AutoForwardInvoiceHelper
 
         if (!String.IsNullOrEmpty(newMeta.AutoForwardPayoutId))
         {
+            // The invoice is already linked to a payout.
             var payout = await GetPayoutById(newMeta.AutoForwardPayoutId, invoice.StoreId, cancellationToken);
             if (payout != null)
             {
-                // The invoice is already linked to a payout. It is possible the payout was just completed, but the invoice doesn't know about it.
+                // It is possible the payout was just completed, but the invoice doesn't know about it.
                 if (payout.State == PayoutState.Completed)
                 {
                     newMeta.AutoForwardCompleted = true;
@@ -170,7 +178,7 @@ public class AutoForwardInvoiceHelper
     public async Task<PayoutData> GetPayoutForDestination(string cryptoCode, string destination, string storeId,
         CancellationToken cancellationToken)
     {
-        var client = await _btcPayServerClientFactory.Create(null, storeId);
+        var client = await GetClient(storeId);
         var payouts = await client.GetStorePayouts(storeId, false, cancellationToken);
         foreach (var onePayout in payouts)
         {
@@ -187,7 +195,7 @@ public class AutoForwardInvoiceHelper
     private async Task CreateOrUpdatePayout(string paymentMethod, string destination, string storeId,
         bool subtractFromAmount, CancellationToken cancellationToken)
     {
-        var client = await _btcPayServerClientFactory.Create(null, storeId);
+        var client = await GetClient(storeId);
         var cryptoCode = paymentMethod.Split("-")[0];
         PayoutData payout = await GetPayoutForDestination(cryptoCode, destination, storeId, cancellationToken);
         List<InvoiceEntity> invoicesIncludedInPayout = new();
@@ -276,7 +284,7 @@ public class AutoForwardInvoiceHelper
                 {
                     // TODO can we solve this better? Payouts would need refactoring so they are properly store scoped...
                     // The payout exists in another store, so we're screwed.
-                    
+
                     _logger.LogInformation(
                         "A payout already exists to {Destination} in another store. Find the store and cancel that payout, so it can be created in this store.",
                         destination);
@@ -324,7 +332,7 @@ public class AutoForwardInvoiceHelper
 
     public async Task<PayoutData> GetPayoutById(string id, string storeId, CancellationToken cancellationToken)
     {
-        var client = await _btcPayServerClientFactory.Create(null, storeId);
+        var client = await GetClient(storeId);
         var payout = await client.GetStorePayout(storeId, id, cancellationToken);
         return payout;
     }
