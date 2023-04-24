@@ -23,8 +23,7 @@ public class InvoiceWatcher : EventHostedServiceBase
     }
 
     private readonly SemaphoreSlim _updateLock = new(1, 1);
-
-    // TODO instead of watching events, use a cronjob kind of thing...
+    
     protected override void SubscribeToEvents()
     {
         base.SubscribeToEvents();
@@ -42,6 +41,7 @@ public class InvoiceWatcher : EventHostedServiceBase
                 InvoiceEntity invoice = invoiceEvent.Invoice;
                 if (_autoForwardInvoiceHelper.CanInvoiceBePaidOut(invoice))
                 {
+                    _autoForwardInvoiceHelper.WriteToLog("Need to sync payout for invoice " + invoice.Id);
                     _autoForwardInvoiceHelper.SyncPayoutForInvoice(invoice, cancellationToken);
                 }
             }

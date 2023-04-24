@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Contracts;
 using BTCPayServer.Client;
 using BTCPayServer.Client.Models;
-using BTCPayServer.Controllers.Greenfield;
 using BTCPayServer.Data;
 using BTCPayServer.Logging;
 using BTCPayServer.Payments;
@@ -25,6 +24,7 @@ public class AutoForwardInvoiceHelper
     private readonly InvoiceRepository _invoiceRepository;
     private readonly IBTCPayServerClientFactory _btcPayServerClientFactory;
     private readonly ILogger _logger;
+    const string LogPrefix = "Auto-Forwarding: ";
 
 
     public AutoForwardInvoiceHelper(ApplicationDbContextFactory applicationDbContextFactory,
@@ -195,28 +195,34 @@ public class AutoForwardInvoiceHelper
     private async Task CreateOrUpdatePayout(string paymentMethod, string destination, string storeId,
         bool subtractFromAmount, CancellationToken cancellationToken)
     {
+
         var client = await GetClient(storeId);
         var cryptoCode = paymentMethod.Split("-")[0];
         PayoutData payout = await GetPayoutForDestination(cryptoCode, destination, storeId, cancellationToken);
         List<InvoiceEntity> invoicesIncludedInPayout = new();
 
         var invoices = await GetUnprocessedInvoicesLinkedToDestination(destination, storeId);
-        decimal totalAmount = 0;
+        decimal totalAmountToForward = 0;
 
         foreach (var invoiceEntity in invoices)
         {
             var amountReceived = GetAmountReceived(invoiceEntity, paymentMethod).ToDecimal(MoneyUnit.BTC);
             if (amountReceived > 0)
             {
+                var metaJson = invoiceEntity.Metadata.ToJObject();
+                AutoForwardInvoiceMetadata newMeta = AutoForwardInvoiceMetadata.FromJObject(metaJson);
+
+                decimal amountToForward = amountReceived * newMeta.AutoForwardPercentage;
+                totalAmountToForward += amountToForward;
+
                 invoicesIncludedInPayout.Add(invoiceEntity);
-                totalAmount += amountReceived;
             }
         }
 
         if (payout != null)
         {
             // TODO maybe "subtractFromAmount" is different now, and we should still cancel? Where is this stored in the payout?
-            if (payout.Amount.Equals(totalAmount))
+            if (payout.Amount.Equals(totalAmountToForward))
             {
                 // The existing payout is correct. No need to change anything.
                 return;
@@ -228,105 +234,116 @@ public class AutoForwardInvoiceHelper
             foreach (var invoice in invoices)
             {
                 await WriteToLog(
-                    $"Cancelled previous Payout ID {payout.Id} because the amount should be {totalAmount} {cryptoCode} instead of {payout.Amount}",
+                    $"Cancelled previous Payout ID {payout.Id} because the amount should be {totalAmountToForward} {cryptoCode} instead of {payout.Amount}",
                     invoice.Id);
             }
         }
 
-        try
+        if (totalAmountToForward > 0)
         {
-            // Create a new payout for the correct amount
-            payout = await CreatePayout(destination, totalAmount, paymentMethod, storeId, subtractFromAmount,
-                cancellationToken);
-
-            string invoiceText = "";
-            for (int i = 0; i < invoicesIncludedInPayout.Count; i++)
+            WriteToLog($"Creating payout to {destination} for {totalAmountToForward} {paymentMethod}");
+            
+            try
             {
-                bool isFirst = i == 0;
-                bool isLast = i == invoicesIncludedInPayout.Count - 1;
+                // Create a new payout for the correct amount
+                payout = await CreatePayout(destination, totalAmountToForward, paymentMethod, storeId,
+                    subtractFromAmount,
+                    cancellationToken);
 
-                if (!isFirst)
+
+                string invoiceText = "";
+                for (int i = 0; i < invoicesIncludedInPayout.Count; i++)
                 {
-                    if (isLast)
+                    bool isFirst = i == 0;
+                    bool isLast = i == invoicesIncludedInPayout.Count - 1;
+
+                    if (!isFirst)
                     {
-                        invoiceText += " and ";
+                        if (isLast)
+                        {
+                            invoiceText += " and ";
+                        }
+                        else
+                        {
+                            invoiceText += ", ";
+                        }
+                    }
+
+                    invoiceText += invoicesIncludedInPayout[i].Id;
+                }
+
+                WriteToLog($"Found {invoicesIncludedInPayout.Count()} invoice(s) to include in payout to {destination}");
+
+                foreach (var invoice in invoicesIncludedInPayout)
+                {
+                    await WriteToLog(
+                        $"Created new Payout ID {payout.Id} for {totalAmountToForward} {cryptoCode} containing the payouts for invoices: {invoiceText}.",
+                        invoice.Id);
+
+                    // Link the invoice to the payout
+                    var metaJson = invoice.Metadata.ToJObject();
+                    AutoForwardInvoiceMetadata newMeta = AutoForwardInvoiceMetadata.FromJObject(metaJson);
+                    newMeta.AutoForwardPayoutId = payout.Id;
+
+                    await _invoiceRepository.UpdateInvoiceMetadata(invoice.Id, invoice.StoreId, newMeta.ToJObject());
+                }
+            }
+            catch (GreenfieldAPIException e)
+            {
+                if (e.APIError.Code.Equals("duplicate-destination"))
+                {
+                    var existingPayout =
+                        await GetPayoutForDestination(cryptoCode, destination, storeId, cancellationToken);
+
+                    if (existingPayout == null)
+                    {
+                        // TODO can we solve this better? Payouts would need refactoring so they are properly store scoped...
+                        // The payout exists in another store, so we're screwed.
+
+                        WriteToLog(
+                            "A payout already exists to {destination} in another store. Find the store and cancel that payout, so it can be created in this store");
                     }
                     else
                     {
-                        invoiceText += ", ";
+                        if (existingPayout.Amount.Equals(totalAmountToForward))
+                        {
+                            // A payout with this destination already exists and the amount is accurate. Do nothing.
+                            WriteToLog(
+                                $"A payout already exists to {destination} with the correct amount ({totalAmountToForward} {cryptoCode})");
+                        }
+                        else
+                        {
+                            // The amount does not match. This is serious!
+                            WriteToLog(
+                                $"Could not create payout to {destination} for {totalAmountToForward} {cryptoCode}. One already exists, but this was not expected");
+
+                            // TODO should we throw?
+                            //throw;
+                        }
                     }
-                }
 
-                invoiceText += invoicesIncludedInPayout[i].Id;
-            }
-
-            foreach (var invoice in invoicesIncludedInPayout)
-            {
-                await WriteToLog(
-                    $"Created new Payout ID {payout.Id} for {totalAmount} {cryptoCode} containing the payouts for invoices {invoiceText}.",
-                    invoice.Id);
-
-                // Link the invoice to the payout
-                var metaJson = invoice.Metadata.ToJObject();
-                AutoForwardInvoiceMetadata newMeta = AutoForwardInvoiceMetadata.FromJObject(metaJson);
-                newMeta.AutoForwardPayoutId = payout.Id;
-
-                await _invoiceRepository.UpdateInvoiceMetadata(invoice.Id, invoice.StoreId, newMeta.ToJObject());
-            }
-        }
-        catch (GreenfieldAPIException e)
-        {
-            if (e.APIError.Code.Equals("duplicate-destination"))
-            {
-                var existingPayout = await GetPayoutForDestination(cryptoCode, destination, storeId, cancellationToken);
-
-                if (existingPayout == null)
-                {
-                    // TODO can we solve this better? Payouts would need refactoring so they are properly store scoped...
-                    // The payout exists in another store, so we're screwed.
-
-                    _logger.LogInformation(
-                        "A payout already exists to {Destination} in another store. Find the store and cancel that payout, so it can be created in this store.",
-                        destination);
+                    // TODO is this ok? This seams to happen a lot. Are we having race conditions?
                 }
                 else
                 {
-                    if (existingPayout.Amount.Equals(totalAmount))
-                    {
-                        // A payout with this destination already exists and the amount is accurate. Do nothing.
-                        _logger.LogInformation(
-                            "A payout already exists to {Destination} with the correct amount ({TotalAmount} {CryptoCode}).",
-                            destination, totalAmount, cryptoCode);
-                    }
-                    else
-                    {
-                        // The amount does not match. This is serious!
-                        _logger.LogError(
-                            "Could not create payout to {Destination} for {TotalAmount} {CryptoCode}. One already exists, but this was not expected.",
-                            destination, totalAmount, cryptoCode);
-
-                        // TODO should we throw?
-                        //throw;
-                    }
+                    throw;
                 }
-
-                // TODO is this ok? This seams to happen a lot. Are we having race conditions?
-            }
-            else
-            {
-                throw;
             }
         }
     }
 
-    private async Task WriteToLog(string message, string invoiceId)
+    public void WriteToLog(string message)
     {
-        _logger.LogInformation("Invoice {InvoiceId}: {Message}", invoiceId, message);
+        _logger.LogInformation("{Prefix}{Message}", LogPrefix, message);
+    }
 
+    public async Task WriteToLog(string message, string invoiceId)
+    {
+        WriteToLog($"Invoice {invoiceId}: {message}");
+
+        // Write to invoice
         InvoiceLogs logs = new InvoiceLogs();
-        string prefix = "Auto-Forwarding: ";
-
-        logs.Write($"{prefix}{message}", InvoiceEventData.EventSeverity.Info);
+        logs.Write($"{LogPrefix}{message}", InvoiceEventData.EventSeverity.Info);
         await _invoiceRepository.AddInvoiceLogs(invoiceId, logs);
     }
 
