@@ -10,10 +10,10 @@ namespace BTCPayServer.Plugins.AutoForward.Services;
 
 public class InvoiceWatcher : EventHostedServiceBase
 {
-
     private readonly AutoForwardInvoiceHelper _autoForwardInvoiceHelper;
 
-    public InvoiceWatcher(EventAggregator eventAggregator, AutoForwardInvoiceHelper autoForwardInvoiceHelper, Logs logs) : base(eventAggregator, logs)
+    public InvoiceWatcher(EventAggregator eventAggregator, AutoForwardInvoiceHelper autoForwardInvoiceHelper, Logs logs)
+        : base(eventAggregator, logs)
     {
         _autoForwardInvoiceHelper = autoForwardInvoiceHelper;
     }
@@ -22,24 +22,37 @@ public class InvoiceWatcher : EventHostedServiceBase
     {
     }
 
+    private readonly SemaphoreSlim _updateLock = new(1, 1);
+
+    // TODO instead of watching events, use a cronjob kind of thing...
     protected override void SubscribeToEvents()
     {
+        base.SubscribeToEvents();
         Subscribe<InvoiceEvent>();
     }
 
-    protected override Task ProcessEvent(object evt, CancellationToken cancellationToken)
+    protected override async Task ProcessEvent(object evt, CancellationToken cancellationToken)
     {
-        if (evt is InvoiceEvent invoiceEvent)
+        try
         {
-            InvoiceEntity invoice = invoiceEvent.Invoice;
-            if (_autoForwardInvoiceHelper.CanInvoiceBePaidOut(invoice))
+            await _updateLock.WaitAsync(cancellationToken);
+
+            if (evt is InvoiceEvent invoiceEvent)
             {
-                // TODO this triggers too soon. Should only be after 6 confirmations, not after 1 or 2...
-                _autoForwardInvoiceHelper.SyncPayoutForInvoice(invoice, cancellationToken);
+                InvoiceEntity invoice = invoiceEvent.Invoice;
+                if (_autoForwardInvoiceHelper.CanInvoiceBePaidOut(invoice))
+                {
+                    _autoForwardInvoiceHelper.SyncPayoutForInvoice(invoice, cancellationToken);
+                }
             }
         }
-
-        return Task.CompletedTask;
+        catch (System.Exception e)
+        {
+            Logs.PayServer.LogWarning(e, "Error while processing auto-forward event");
+        }
+        finally
+        {
+            _updateLock.Release();
+        }
     }
-
 }
