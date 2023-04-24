@@ -36,7 +36,7 @@ public class InvoiceWatcher : EventHostedServiceBase
         {
             await _updateLock.WaitAsync(cancellationToken);
 
-            if (evt is InvoiceEvent invoiceEvent)
+            if (evt is InvoiceEvent { EventCode: InvoiceEventCode.Completed } invoiceEvent)
             {
                 InvoiceEntity invoice = invoiceEvent.Invoice;
                 if (_autoForwardInvoiceHelper.CanInvoiceBePaidOut(invoice))
