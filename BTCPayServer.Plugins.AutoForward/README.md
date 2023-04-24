@@ -14,6 +14,11 @@
 - Before a payout is done, the destination needs to be pre-created and the destination must have a balance. This acts as a safeguard so the wrong destination can never receive too much.
 - Only BTC OnChain payments are currently supported.
 
+## Known limitations
+- BTC-OnChain only (no Lightning Network support)
+- Payouts are automatically created, but you should be careful to not have the same destination address in another store, because a duplicate destination error will occur.
+- Auto-forwardable invoices must be created through the Greenfield API. There is no UI to create an auto-forwardable invoice.
+
 ## API Calls
 
 ### Creating an invoice
