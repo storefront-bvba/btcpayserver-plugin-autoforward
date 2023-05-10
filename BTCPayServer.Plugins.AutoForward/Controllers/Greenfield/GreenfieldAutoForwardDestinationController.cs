@@ -104,7 +104,7 @@ namespace BTCPayServer.Plugins.AutoForward.Controllers.Greenfield
             try
             {
                 entity = await _autoForwardDestinationRepository.Create(entity);
-                await _helper.UpdatePayoutsToDestination(entity.Destination);
+                await UpdatePayout(entity);
             }
             catch (DbUpdateException e)
             {
@@ -133,7 +133,7 @@ namespace BTCPayServer.Plugins.AutoForward.Controllers.Greenfield
             try
             {
                 var entity = await _autoForwardDestinationRepository.UpdatePayoutsAllowed(storeId, destinationId, (bool)request.PayoutsAllowed);
-                await _helper.UpdatePayoutsToDestination(entity.Destination);
+                await UpdatePayout(entity);
                 
                 return Ok(ToModel(entity));
             }
@@ -142,6 +142,12 @@ namespace BTCPayServer.Plugins.AutoForward.Controllers.Greenfield
                 throw new AutoForwardApiException(404, "destination-not-found", $"Destination {destinationId} could not be found in store {storeId}.");
             }
         }
+
+        private async Task UpdatePayout(AutoForwardDestination entity)
+        {
+            string cryptoCode = entity.PaymentMethod.Split()[0];
+            await _helper.UpdatePayoutsToDestination(cryptoCode, entity.Destination, entity.StoreId);
+        } 
 
         private AutoForwardDestinationData ToModel(AutoForwardDestination destination)
         {

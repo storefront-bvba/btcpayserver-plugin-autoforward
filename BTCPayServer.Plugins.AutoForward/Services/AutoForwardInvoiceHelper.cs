@@ -163,9 +163,7 @@ public class AutoForwardInvoiceHelper
                 // It is possible the payout was just completed, but the invoice doesn't know about it.
                 if (payout.State == PayoutState.Completed)
                 {
-                    newMeta.AutoForwardCompleted = true;
-                    invoice.Metadata = newMeta;
-                    await _invoiceRepository.UpdateInvoiceMetadata(invoice.Id, invoice.StoreId, newMeta.ToJObject());
+                    await HandleCompletedPayout(invoice);
                 }
             }
         }
@@ -178,6 +176,16 @@ public class AutoForwardInvoiceHelper
             await CreateOrUpdatePayout(paymentMethod, destination, invoice.StoreId, subtractFromAmount,
                 cancellationToken);
         }
+    }
+
+    private async Task HandleCompletedPayout(InvoiceEntity invoice)
+    {
+        var metaJson = invoice.Metadata.ToJObject();
+        AutoForwardInvoiceMetadata newMeta = AutoForwardInvoiceMetadata.FromJObject(metaJson);
+        newMeta.AutoForwardCompleted = true;
+        invoice.Metadata = newMeta;
+        
+        await _invoiceRepository.UpdateInvoiceMetadata(invoice.Id, invoice.StoreId, newMeta.ToJObject());
     }
 
     public async Task<PayoutData> GetPayoutForDestination(string cryptoCode, string destination, string storeId,
@@ -378,10 +386,12 @@ public class AutoForwardInvoiceHelper
         return false;
     }
 
-    public async Task UpdatePayoutsToDestination(string destination)
+    public async Task UpdatePayoutsToDestination(string cryptoCode, string destination, string storeId)
     {
         // TODO create or approve payouts if the destination is allowed
         // TODO cancel payouts if the destination is not allowed
         // TODO update invoice logs to explain what happened
     }
+    
+    // TODO Create a cronjob that watches for payouts that have become complete. If they are complete, run HandleCompletedPayout(invoice) on them.
 }
