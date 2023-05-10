@@ -1,0 +1,113 @@
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Components
+@using BTCPayServer.Plugins.AutoForward.Views
+@using BTCPayServer.Services
+@using Microsoft.AspNetCore.Mvc.TagHelpers
+@inject DisplayFormatter DisplayFormatter
+@model BTCPayServer.Plugins.AutoForward.Controllers.InvoicesViewModel
+@{
+    ViewData.SetActivePage(PluginNavPages.Index, "Auto-Forward Payments");
+    ViewData.SetActiveCategory(typeof(AutoForwardNavPages));
+}
+
+<div class="sticky-header-setup"></div>
+<div class="sticky-header mb-l">
+    <partial name="Partials/AutoForwardMenu"/>
+</div>
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">Help</h3>
+</div>
+
+<h3>Features</h3>
+<ul>
+    <li>Allows the creation of invoices for which the received funds will automatically be forwarded to another address.</li>
+    <li>The target destination address is defined on invoice creation.</li>
+    <li>The percentage of funds to be forwarded is defined on invoice creation.</li>
+    <li>On creation, you can define if the fees should be subtracted from the amount or if you pay the fees.</li>
+    <li>When an invoice is settled, a payout will be automatically created.</li>
+    <li>If there are multiple payouts to the same destination, they will be bundled in 1 payout. In this case the old payout is cancelled and a new one is created.</li>
+    <li>A payout processor can be used to automatically pay out the payouts every x hours (if you are using a hot wallet in your store).</li>
+    <li>Cold wallets should also be supported, but you will need to manually sign for the payouts.</li>
+    <li>Every time an invoice is settled, the calculation of the payouts is done again so there should be no discrepancies.</li>
+    <li>An overview page exists where you can view the invoices to forward and their status.</li>
+    <li>Before a payout is done, the destination needs to be pre-created and the destination must have a balance. This acts as a safeguard so the wrong destination can never receive too much.</li>
+    <li>Only BTC OnChain payments are currently supported.</li>
+</ul>
+
+<h3>Known limitations</h3>
+<ul>
+    <li>BTC-OnChain only (no Lightning Network support)</li>
+    <li>Payouts are automatically created, but you should be careful to not have the same destination address in another store, because a duplicate destination error will occur.</li>
+    <li>Auto-forwardable invoices must be created through the Greenfield API. There is no UI to create an auto-forwardable invoice.</li>
+</ul>
+
+<h3>Auto-Forwardable Invoices</h3>
+<p>For an invoice to be "auto-forwardable", they need to have these 2 metadata fields:</p>
+<ul>
+    <li>
+        <strong>autoForwardToAddress</strong>
+        Contains a valid destination where to forward the funds to
+    </li>
+    <li>
+        <strong>autoForwardPercentage</strong>
+        Contains the percentage to auto-forward written as a number between 0 and 1
+    </li>
+</ul>
+<p>Creating these invoices is currently only possible using the API.</p>
+
+<h3>
+    Destinations
+</h3>
+<ul>
+    <li>Before a payout can take place, the destination must be created first.</li>
+    <li>Before a payout can take place, the destination must have payouts allowed.</li>
+</ul>
+
+<h3>Payouts</h3>
+<ul>
+    <li>This plugin auto-creates payouts to approved destinations when an invoice is settled.</li>
+    <li>This plugin auto-updates payouts to the same destination when an extra invoice is settled. The previous payout to that destination is cancelled and a new one is created instead for the new amount.</li>
+    <li>By design, BTCPay Server can only have 1 payout to the same destination, so amounts to the same destination are combined.</li>
+    <li>When a payout is completed or canceled, then a new one to the same destination can be created again.</li>
+    <li>If you manually cancel a payout, the plugin will auto-create it again if the destination is approved.</li>
+    <li>If you manually approve a payout, it will execute even if the plugin normally would not do that.</li>
+    <li>If you manually create a payout (or the customer creates one through a pull payment), that payout will not be managed by the plugin so you could risk payout out too much. Letting the plugin handle everything is probably best.</li>
+    <li>This plugin creates payouts with the status "Approved". This means they are immediately payable. You can do so manually, or use a payout processor that pays everything automatically at configured intervals.</li>
+</ul>
+
+<h3>
+    How does this plugin work?
+</h3>
+<ul>
+    <li>Every time the situation changes, payouts are automatically created, updated or canceled.</li>
+    <li>On every action, the invoice log is updated so you can see what is going on.</li>
+</ul>
+
+<h3>API Calls</h3>
+<h4>Creating an auto-forwardable invoice</h4>
+<pre>
+<code>
+curl -v --header "Authorization: token c56e3f2eee549b6bd9d3ae7a2210f9c79a639460" --data '{amount: 100, currency: "EUR", metadata: { autoForwardToAddress: "bcrt1q9q26gunpl7e0l45unnqqw9k3dzlsqeqlny3gpv", autoForwardPercentage: 0.99 }}' --header "Content-Type: application/json" http://127.0.0.1:14142/api/v1/stores/5aYTpeJr8C1MThpMw4NvQwCyes4tBve1zZTMrmHibCbD/invoices
+</code>
+</pre>
+
+<h4>Listing all known destinations for Auto-Forwarding</h4>
+<pre>
+<code>
+curl -v --header "Authorization: token c56e3f2eee549b6bd9d3ae7a2210f9c79a639460" --header "Content-Type: application/json" http://127.0.0.1:14142/api/v1/stores/5aYTpeJr8C1MThpMw4NvQwCyes4tBve1zZTMrmHibCbD/autoforward-destinations
+</code></pre>
+
+<h4>Creating a new destination for Auto-Forwarding</h4>
+<pre>
+<code>
+curl -v --header "Authorization: token c56e3f2eee549b6bd9d3ae7a2210f9c79a639460" --data '{destination: "bcrt1q9q26gunpl7e0l45unnqqw9k3dzlsqeqlny3gpv", paymentMethod: "BTC-OnChain" }' --header "Content-Type: application/json" http://127.0.0.1:14142/api/v1/stores/5aYTpeJr8C1MThpMw4NvQwCyes4tBve1zZTMrmHibCbD/autoforward-destinations
+</code>
+</pre>
+
+<h4>Enabling payouts for a destination</h4>
+<pre>
+<code>
+curl -v -XPUT --header "Authorization: token c56e3f2eee549b6bd9d3ae7a2210f9c79a639460" --data '{payoutsAllowed: true }' --header "Content-Type: application/json" http://127.0.0.1:14142/api/v1/stores/5aYTpeJr8C1MThpMw4NvQwCyes4tBve1zZTMrmHibCbD/autoforward-destinations/e883edab-e51c-4ae8-8720-3d77c489f1ad
+</code>
+</pre>

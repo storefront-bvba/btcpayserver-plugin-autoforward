@@ -10,6 +10,7 @@ using BTCPayServer.Data;
 using BTCPayServer.Logging;
 using BTCPayServer.Payments;
 using BTCPayServer.Plugins.AutoForward.Data;
+using BTCPayServer.Plugins.AutoForward.Exception;
 using BTCPayServer.Services.Invoices;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -24,17 +25,21 @@ public class AutoForwardInvoiceHelper
     private readonly InvoiceRepository _invoiceRepository;
     private readonly IBTCPayServerClientFactory _btcPayServerClientFactory;
     private readonly ILogger _logger;
+    private readonly AutoForwardDestinationRepository _autoForwardDestinationRepository;
+    private readonly AutoForwardDbContextFactory _autoForwardDbContextFactory;
     const string LogPrefix = "Auto-Forwarding: ";
 
 
     public AutoForwardInvoiceHelper(ApplicationDbContextFactory applicationDbContextFactory,
         InvoiceRepository invoiceRepository, IBTCPayServerClientFactory btcPayServerClientFactory,
-        ILoggerFactory loggerFactory)
+        ILoggerFactory loggerFactory,AutoForwardDestinationRepository autoForwardDestinationRepository, AutoForwardDbContextFactory autoForwardDbContextFactory)
     {
         _applicationDbContextFactory = applicationDbContextFactory;
         _invoiceRepository = invoiceRepository;
         _btcPayServerClientFactory = btcPayServerClientFactory;
         _logger = loggerFactory.CreateLogger("AutoForward");
+        _autoForwardDestinationRepository = autoForwardDestinationRepository;
+        _autoForwardDbContextFactory = autoForwardDbContextFactory;
     }
 
 
@@ -63,7 +68,7 @@ public class AutoForwardInvoiceHelper
     {
         // TODO this method does not scale and will be very slow if the invoice list is long
         return await GetInvoicesBySql(
-            $"select * FROM \"Invoices\" where \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardToAddress' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPercentage' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'AutoForwardCompletedPayoutId' is null and \"Status\" = 'complete'");
+            $"select * FROM \"Invoices\" where \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardToAddress' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPercentage' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardCompletedPayoutId' is null and \"Status\" = 'complete'");
     }
 
     public async Task<InvoiceEntity[]> GetUnprocessedInvoicesLinkedToDestination(string destination, string storeId)
@@ -71,7 +76,7 @@ public class AutoForwardInvoiceHelper
         // TODO this method does not scale and will be very slow if the invoice list is long
         // TODO switch to SQL prepared statements
         string sql =
-            $"select * FROM \"Invoices\" where \"Blob2\"::jsonb -> 'metadata' ->> 'autoForwardToAddress' = '{destination}' and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPercentage' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'AutoForwardCompletedPayoutId' is null and \"Status\" = 'complete' and \"StoreDataId\" = '{storeId}'";
+            $"select * FROM \"Invoices\" where \"Blob2\"::jsonb -> 'metadata' ->> 'autoForwardToAddress' = '{destination}' and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPercentage' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardCompletedPayoutId' is null and \"Status\" = 'complete' and \"StoreDataId\" = '{storeId}'";
         return await GetInvoicesBySql(sql);
     }
 
@@ -127,7 +132,7 @@ public class AutoForwardInvoiceHelper
         createOnChainTransactionRequest.Destinations.Add(destination);
 
         CreatePayoutThroughStoreRequest createPayoutThroughStoreRequest = new()
-            { Amount = amount, Destination = destinationAddress, PaymentMethod = paymentMethod };
+            { Amount = amount, Destination = destinationAddress, PaymentMethod = paymentMethod, Approved = true};
 
         var payout = await client.CreatePayout(storeId, createPayoutThroughStoreRequest, cancellationToken);
         return payout;
@@ -198,6 +203,7 @@ public class AutoForwardInvoiceHelper
 
         var client = await GetClient(storeId);
         var cryptoCode = paymentMethod.Split("-")[0];
+
         PayoutData payout = await GetPayoutForDestination(cryptoCode, destination, storeId, cancellationToken);
         List<InvoiceEntity> invoicesIncludedInPayout = new();
 
@@ -370,5 +376,12 @@ public class AutoForwardInvoiceHelper
         }
 
         return false;
+    }
+
+    public async Task UpdatePayoutsToDestination(string destination)
+    {
+        // TODO create or approve payouts if the destination is allowed
+        // TODO cancel payouts if the destination is not allowed
+        // TODO update invoice logs to explain what happened
     }
 }

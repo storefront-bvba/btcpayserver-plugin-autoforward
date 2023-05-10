@@ -57,18 +57,20 @@ namespace BTCPayServer.Plugins.AutoForward.Controllers.Greenfield
     public class GreenfieldAutoForwardDestinationController : ControllerBase
     {
         private readonly AutoForwardDestinationRepository _autoForwardDestinationRepository;
+        private readonly AutoForwardInvoiceHelper _helper;
 
         public GreenfieldAutoForwardDestinationController(
-            AutoForwardDestinationRepository autoForwardDestinationRepository)
+            AutoForwardDestinationRepository autoForwardDestinationRepository, AutoForwardInvoiceHelper helper)
         {
             _autoForwardDestinationRepository = autoForwardDestinationRepository;
+            _helper = helper;
         }
 
 
         [HttpGet("~/api/v1/stores/{storeId}/autoforward-destinations")]
         [Authorize(Policy = Policies.CanManagePullPayments,
             AuthenticationSchemes = AuthenticationSchemes.Greenfield)]
-        public async Task<IActionResult> ListAutoForwardDestinations(string storeId, CancellationToken cancellationToken = default)
+        public async Task<IActionResult> ListAutoForwardDestination(string storeId, CancellationToken cancellationToken = default)
         {
             AutoForwardDestination[] destinations = await _autoForwardDestinationRepository.FindByStoreId(storeId, cancellationToken);
             AutoForwardDestinationData[] responses = new AutoForwardDestinationData[destinations.Length];
@@ -86,7 +88,7 @@ namespace BTCPayServer.Plugins.AutoForward.Controllers.Greenfield
         [HttpPost("~/api/v1/stores/{storeId}/autoforward-destinations")]
         [Authorize(Policy = Policies.CanManagePullPayments,
             AuthenticationSchemes = AuthenticationSchemes.Greenfield)]
-        public async Task<IActionResult> CreateAutoForwardDestinations(string storeId, CreateAutoForwardDestinationRequest request, CancellationToken cancellationToken)
+        public async Task<IActionResult> CreateAutoForwardDestination(string storeId, CreateAutoForwardDestinationRequest request, CancellationToken cancellationToken)
         {
             request ??= new CreateAutoForwardDestinationRequest();
 
@@ -102,6 +104,7 @@ namespace BTCPayServer.Plugins.AutoForward.Controllers.Greenfield
             try
             {
                 entity = await _autoForwardDestinationRepository.Create(entity);
+                await _helper.UpdatePayoutsToDestination(entity.Destination);
             }
             catch (DbUpdateException e)
             {
@@ -119,7 +122,7 @@ namespace BTCPayServer.Plugins.AutoForward.Controllers.Greenfield
         [HttpPut("~/api/v1/stores/{storeId}/autoforward-destinations/{destinationId}")]
         [Authorize(Policy = Policies.CanManagePullPayments,
             AuthenticationSchemes = AuthenticationSchemes.Greenfield)]
-        public async Task<IActionResult> CreateAutoForwardDestinations(string storeId, string destinationId, UpdateAutoForwardDestinationRequest request, CancellationToken cancellationToken)
+        public async Task<IActionResult> UpdateAutoForwardDestination(string storeId, string destinationId, UpdateAutoForwardDestinationRequest request, CancellationToken cancellationToken)
         {
             request ??= new UpdateAutoForwardDestinationRequest();
             if (request.PayoutsAllowed == null)
@@ -130,6 +133,8 @@ namespace BTCPayServer.Plugins.AutoForward.Controllers.Greenfield
             try
             {
                 var entity = await _autoForwardDestinationRepository.UpdatePayoutsAllowed(storeId, destinationId, (bool)request.PayoutsAllowed);
+                await _helper.UpdatePayoutsToDestination(entity.Destination);
+                
                 return Ok(ToModel(entity));
             }
             catch (RecordNotFoundException)
@@ -137,7 +142,6 @@ namespace BTCPayServer.Plugins.AutoForward.Controllers.Greenfield
                 throw new AutoForwardApiException(404, "destination-not-found", $"Destination {destinationId} could not be found in store {storeId}.");
             }
         }
-
 
         private AutoForwardDestinationData ToModel(AutoForwardDestination destination)
         {

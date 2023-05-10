@@ -10,22 +10,13 @@
 @model BTCPayServer.Plugins.AutoForward.Controllers.InvoicesViewModel
 @{
     ViewData.SetActivePage(PluginNavPages.Index, "Auto-Forward Payments");
+    ViewData.SetActiveCategory(typeof(AutoForwardNavPages));
 }
 
 <div class="sticky-header-setup"></div>
 <div class="sticky-header mb-l">
-    <h2 class="mt-1 mb-2 mb-lg-4">
-        @ViewData["Title"]
-    </h2>
-    <nav id="SectionNav">
-        <div class="nav">
-            <a id="SectionNav-@AutoForwardNavPages.Invoices" class="nav-link active @ViewData.IsActivePage(AutoForwardNavPages.Invoices)" asp-action="Index">Invoices</a>
-            <a id="SectionNav-@AutoForwardNavPages.Destinations" class="nav-link @ViewData.IsActivePage(AutoForwardNavPages.Destinations)" asp-action="Destinations">Destinations</a>
-            <!--
-            <a id="SectionNav-@AutoForwardNavPages.Payouts" class="nav-link @ViewData.IsActivePage(AutoForwardNavPages.Payouts)" asp-action="Payouts">Payouts</a>
-            -->
-        </div>
-    </nav>
+
+    <partial name="Partials/AutoForwardMenu"/>
 
     @* 
     TODO add support to manually create an auto-forwardable invoice?
@@ -36,30 +27,12 @@
 
 </div>
 
-<p>This page shows all invoices that have auto-forwarding enabled. For an invoice to be "auto-forwardable", they need to have these 2 metadata fields:</p>
-<ul>
-    <li>
-        <strong>autoForwardToAddress</strong>
-        Contains a valid destination where to forward the funds to
-    </li>
-    <li>
-        <strong>autoForwardPercentage</strong>
-        Contains the percentage to auto-forward written as a number between 0 and 1
-    </li>
-</ul>
-<p>Creating these invoices is currently only possible using the Greenfield API. For example:</p>
-<pre>
-    <code>
-    curl -v --header "Authorization: token YOUR_API_KEY_GOES_HERE" --data '{amount: 50, metadata: { autoForwardToAddress: "abc", autoForwardPercentage: 0.99, autoForwardSubtractFeeFromAmount: true }}' --header "Content-Type: application/json" http://127.0.0.1:14142/api/v1/stores/YOUR_STORE_ID_GOES_HERE/invoices
-    </code>
-</pre>
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">Auto-Forwardable Invoices</h3>
+</div>
 
+<p>This page shows all invoices that have auto-forwarding enabled. For an invoice to be "auto-forwardable", certain conditions need to be met. <a asp-action="Help">Read about this in our help section.</a></p>
 
-<h3>TODO: When payouts are processed, need to save the Payout ID on the invoices so they are considered paid out!</h3>
-<h3>TODO: Test multiple forwarding destinations</h3>
-<h3>TODO: Unit tests?</h3>
-
-<h2>Invoices</h2>
 <div class="table-responsive">
     <table id="invoices" class="table table-hover">
         <thead>
@@ -220,3 +193,10 @@
 @*     { *@
 @*         <li class="list-group-item">@item.Id at @item.Timestamp.ToString("F")</li> *@
 @*     } *@
+
+
+<h2>TODO</h2>
+<ul>
+    <li>When payouts are processed, need to save the Payout ID on the invoices so they are considered paid out!</li>
+    <li>Test multiple forwarding destinations</li>
+</ul>

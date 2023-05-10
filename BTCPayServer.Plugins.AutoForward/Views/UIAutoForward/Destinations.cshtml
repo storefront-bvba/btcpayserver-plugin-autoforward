@@ -6,34 +6,19 @@
 @inject DisplayFormatter DisplayFormatter
 @model BTCPayServer.Plugins.AutoForward.Controllers.DestinationsViewModel
 @{
-    ViewData.SetActivePage(PluginNavPages.Index, "Auto-Forward Destinations");
+    ViewData.SetActivePage(PluginNavPages.Index, "Auto-Forward Payments");
+    ViewData.SetActiveCategory(typeof(AutoForwardNavPages));
 }
 
 <div class="sticky-header-setup"></div>
 <div class="sticky-header mb-l">
-    <h2 class="mt-1 mb-2 mb-lg-4">
-        @ViewData["Title"]
-    </h2>
-    <nav id="SectionNav">
-        <div class="nav">
-            <a id="SectionNav-@AutoForwardNavPages.Invoices" class="nav-link @ViewData.IsActivePage(AutoForwardNavPages.Invoices)" asp-action="Index">Invoices</a>
-            <a id="SectionNav-@AutoForwardNavPages.Destinations" class="nav-link active @ViewData.IsActivePage(AutoForwardNavPages.Destinations)" asp-action="Index">Destinations</a>
-            <!--
-            <a id="SectionNav-@AutoForwardNavPages.Payouts" class="nav-link @ViewData.IsActivePage(AutoForwardNavPages.Payouts)" asp-action="Payouts">Payouts</a>
-            -->
-        </div>
-    </nav>
+    <partial name="Partials/AutoForwardMenu"/>
 </div>
 
-<p>This page shows all destinations for auto-forwarding.</p>
-<p>Creating these destinations is currently only possible using the Greenfield API. For example:</p>
-<pre>
-    <code>
-    curl -v --header "Authorization: token YOUR_API_KEY_GOES_HERE" --data '{destination: "BITCOIN_ADDRESS_GOES_HERE", paymentMethod: "BTC-OnChain" }' --header "Content-Type: application/json" http://127.0.0.1:14142/api/v1/stores/YOUR_STORE_ID_GOES_HERE/autoforward-destinations
-    </code>
-</pre>
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">Destinations</h3>
+</div>
 
-<h2>Destinations</h2>
 <div class="table-responsive">
     <table id="destinations" class="table table-hover">
         <thead>

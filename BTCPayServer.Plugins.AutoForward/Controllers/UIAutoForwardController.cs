@@ -168,7 +168,12 @@ public class UIAutoForwardController : Controller
         model.Destinations = await _autoForwardDestinationRepository.FindAll(cancellationToken);
         return await Task.FromResult<IActionResult>(View(model));
     }
-    
+
+    [Route("~/plugins/autoforward/help")]
+    public Task<IActionResult> Help()
+    {
+        return Task.FromResult<IActionResult>(View());
+    }
 }
 
 public class InvoicesViewModel : BasePagingViewModel

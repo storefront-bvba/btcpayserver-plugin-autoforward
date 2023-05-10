@@ -6,24 +6,19 @@
 @inject DisplayFormatter DisplayFormatter
 @model BTCPayServer.Plugins.AutoForward.Controllers.InvoicesViewModel
 @{
-    ViewData.SetActivePage(PluginNavPages.Index, "Auto-Forward Payments");
+    ViewData.SetActivePage(AutoForwardNavPages.Payouts, "Auto-Forward Payments");
+    ViewData.SetActiveCategory(typeof(PluginNavPages));
 }
 
 <div class="sticky-header-setup"></div>
 <div class="sticky-header mb-l">
-    <h2 class="mt-1 mb-2 mb-lg-4">
-        @ViewData["Title"]
-    </h2>
-    <nav id="SectionNav">
-        <div class="nav">
-            <a id="SectionNav-@AutoForwardNavPages.Invoices" class="nav-link @ViewData.IsActivePage(AutoForwardNavPages.Invoices)" asp-action="Index">Auto-Forwardable Invoices</a>
-            <a id="SectionNav-@AutoForwardNavPages.Payouts" class="nav-link @ViewData.IsActivePage(AutoForwardNavPages.Payouts)" asp-action="Payouts">Payouts</a>
-        </div>
-    </nav>
+    <partial name="Partials/AutoForwardMenu"/>
 </div>
 
 
-<h2>Payouts</h2>
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">Payouts</h3>
+</div>
 <div class="table-responsive">
     <table id="payouts" class="table table-hover">
         <thead>
@@ -35,7 +30,7 @@
         </tr>
         </thead>
         <tbody>
-       
+
         </tbody>
     </table>
 </div>
