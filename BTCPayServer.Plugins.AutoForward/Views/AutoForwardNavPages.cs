@@ -5,5 +5,6 @@ public enum AutoForwardNavPages
     Invoices,
     Payouts,
     Destinations,
-    Help
+    Help,
+    Logs
 }

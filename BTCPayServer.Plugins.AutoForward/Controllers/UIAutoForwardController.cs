@@ -127,7 +127,7 @@ public class UIAutoForwardController : Controller
             {
                 payout = await _helper.GetPayoutById(meta.AutoForwardPayoutId, invoice.StoreId, cancellationToken);
             }
-            else if(_helper.CanInvoiceBePaidOut(invoice))
+            else if(_helper.IsValidAutoForwardableInvoice(invoice, false))
             {
                 payout = await _helper.GetPayoutForDestination(cryptoCode, meta.AutoForwardToAddress, invoice.StoreId, cancellationToken);
             }
@@ -143,8 +143,9 @@ public class UIAutoForwardController : Controller
                 HasRefund = hasRefund, // TODO do something with refund info?
                 Payments = payments,
                 AutoForwardToAddress = meta.AutoForwardToAddress,
-                AutoForwardPayout = payout,
+                Payout = payout,
                 AutoForwardPercentage = meta.AutoForwardPercentage,
+                AutoForwardCompleted = meta.AutoForwardCompleted,
                 AmountReceived = amountReceived,
                 AmountReceivedCryptoCode = "BTC" // TODO make dynamic
             });
@@ -174,6 +175,21 @@ public class UIAutoForwardController : Controller
     {
         return Task.FromResult<IActionResult>(View());
     }
+    
+    [Route("~/plugins/autoforward/logs")]
+    public Task<IActionResult> Logs()
+    {
+        return Task.FromResult<IActionResult>(View());
+    }
+
+    [Route("~/plugins/autoforward/update")]
+    public async Task<IActionResult> UpdateEverything(CancellationToken cancellationToken)
+    {
+        await _helper.UpdateEverything(cancellationToken);
+        
+        // TODO show message on top of page when done
+        return RedirectToAction(nameof(Index));
+    }
 }
 
 public class InvoicesViewModel : BasePagingViewModel
@@ -199,8 +215,8 @@ public class AutoForwardableInvoiceModel
     
     public string AutoForwardToAddress { get; set; }
     public decimal AutoForwardPercentage { get; set; }
-    public decimal AutoForwardAmount{ get; set; }
-    public Client.Models.PayoutData AutoForwardPayout { get; set; }
+    public bool AutoForwardCompleted { get; set; }
+    public Client.Models.PayoutData Payout { get; set; }
 
     public InvoiceState Status { get; set; }
     public decimal Amount { get; set; }

@@ -41,19 +41,23 @@
             <th class="text-nowrap">Invoice ID</th>
             <th class="text-nowrap">Order ID</th>
             <th class="text-nowrap">Forward to</th>
-            <th class="text-nowrap text-end">Percentage to forward</th>
+            <th class="text-nowrap text-end">Percent to forward</th>
             <th class="text-nowrap">Invoice Status</th>
-            <th class="text-nowrap text-end">Amount invoiced</th>
-            <th class="text-nowrap text-end">Amount received</th>
-            <th class="text-nowrap text-end">Amount to forward</th>
-            <th class="text-nowrap">Payout Status</th>
+            <th class="text-nowrap text-end">Invoiced</th>
+            <th class="text-nowrap text-end">Received</th>
+            <th class="text-nowrap text-end">To forward</th>
             <th class="text-nowrap">Payout ID</th>
+            <th class="text-nowrap">Payout Status</th>
+            <th class="text-nowrap text-end">Payout Amount</th>
+            <th class="text-nowrap text-end">Forwarded</th>
         </tr>
         </thead>
         <tbody>
         @{
             decimal totalToForward = 0;
+            decimal totalForwarded = 0;
             decimal totalReceived = 0;
+            decimal totalPayoutAmount = 0;
         }
 
         @foreach (var invoice in Model.Invoices)
@@ -64,13 +68,21 @@
             if (invoice.AmountReceived.ToDecimal(MoneyUnit.BTC) > 0)
             {
                 amountReceived = invoice.AmountReceived.ToDecimal(MoneyUnit.BTC);
-                amountToForward = invoice.AutoForwardPercentage * totalReceived;
+                amountToForward = invoice.AutoForwardPercentage * amountReceived;
 
                 totalToForward += amountToForward;
                 totalReceived += amountReceived;
+                if (invoice.Payout != null)
+                {
+                    totalPayoutAmount += invoice.Payout.Amount;
+                    if (invoice.Payout.State == PayoutState.Completed)
+                    {
+                        totalForwarded += amountToForward;
+                    }
+                }
             }
 
-            <tr id="invoice_@invoice.InvoiceId" class="invoice-row">
+            <tr id="invoice_@invoice.InvoiceId" class="invoice-row @(invoice.AutoForwardCompleted ? "table-secondary":"")">
                 <td>@invoice.Date.ToBrowserDate()</td>
                 <td class="text-break">
                     <a asp-controller="UIInvoice" asp-action="Invoice" class="invoice-details-link" asp-route-invoiceId="@invoice.InvoiceId">
@@ -99,9 +111,12 @@
                         }
                     </span>
 
-                    <span class="badge badge-@invoice.Status.Status.ToModernStatus().ToString().ToLower()">
-                        @invoice.Status.Status.ToString()
-                    </span>
+                    @if (invoice.AutoForwardCompleted)
+                    {
+                        <span class="badge badge-settled">
+                            Forwarded
+                        </span>
+                    }
 
                     @foreach (var paymentType in invoice.Payments.Select(payment => payment.GetPaymentMethodId()?.PaymentType).Distinct().Where(type => type != null && !string.IsNullOrEmpty(type.GetBadge())))
                     {
@@ -124,21 +139,37 @@
                 </td>
 
                 <!-- Amount to forward -->
-                <td class="text-end">
+                <td class="text-end text-nowrap">
                     @if (amountToForward > 0)
                     {
                         @DisplayFormatter.Currency((decimal)amountToForward, invoice.AmountReceivedCryptoCode)
                     }
                 </td>
 
-                <!-- Payout status -->
-                <td>
-                    @invoice.AutoForwardPayout?.State
-                </td>
-
                 <!-- Payout ID -->
                 <td>
-                    @invoice.AutoForwardPayout?.Id
+                    @invoice.Payout?.Id
+                </td>
+
+                <!-- Payout status -->
+                <td>
+                    @invoice.Payout?.State
+                </td>
+
+                <!-- Payout amount -->
+                <td class="text-end text-nowrap">
+                    @if (invoice.Payout != null)
+                    {
+                        @DisplayFormatter.Currency(invoice.Payout.Amount, invoice.Payout.CryptoCode)
+                    }
+                </td>
+
+                <!-- Amount forwarded -->
+                <td class="text-end text-nowrap">
+                    @if (invoice.Payout?.State == PayoutState.Completed && amountToForward > 0)
+                    {
+                        @DisplayFormatter.Currency((decimal)amountToForward, invoice.AmountReceivedCryptoCode)
+                    }
                 </td>
             </tr>
         }
@@ -159,6 +190,14 @@
             </th>
             <th class="text-end text-nowrap">
                 @DisplayFormatter.Currency(totalToForward, "BTC")
+            </th>
+            <th></th>
+            <th></th>
+             <th class="text-end text-nowrap">
+                            @DisplayFormatter.Currency(totalPayoutAmount, "BTC")
+                        </th>
+            <th class="text-end text-nowrap">
+                @DisplayFormatter.Currency(totalForwarded, "BTC")
             </th>
 
         </tr>
@@ -193,10 +232,3 @@
 @*     { *@
 @*         <li class="list-group-item">@item.Id at @item.Timestamp.ToString("F")</li> *@
 @*     } *@
-
-
-<h2>TODO</h2>
-<ul>
-    <li>When payouts are processed, need to save the Payout ID on the invoices so they are considered paid out!</li>
-    <li>Test multiple forwarding destinations</li>
-</ul>

@@ -22,23 +22,25 @@
 <h3>Features</h3>
 <ul>
     <li>Allows the creation of invoices for which the received funds will automatically be forwarded to another address.</li>
-    <li>The target destination address is defined on invoice creation.</li>
-    <li>The percentage of funds to be forwarded is defined on invoice creation.</li>
-    <li>On creation, you can define if the fees should be subtracted from the amount or if you pay the fees.</li>
-    <li>When an invoice is settled, a payout will be automatically created.</li>
-    <li>If there are multiple payouts to the same destination, they will be bundled in 1 payout. In this case the old payout is cancelled and a new one is created.</li>
-    <li>A payout processor can be used to automatically pay out the payouts every x hours (if you are using a hot wallet in your store).</li>
-    <li>Cold wallets should also be supported, but you will need to manually sign for the payouts.</li>
-    <li>Every time an invoice is settled, the calculation of the payouts is done again so there should be no discrepancies.</li>
+    <li>Both the forwarding destination address and percentage are defined on invoice creation.</li>
+    @* <li>On creation, you can define if the fees should be subtracted from the amount or if you pay the fees.</li> *@
+    <li>When an invoice is settled, a payout will be automatically created for it.</li>
+    <li>If there are multiple payouts to the same destination, they will be bundled in 1 payout. In this case the old payout is cancelled and a new one is created (BTCPay only supports 1 payout per destination to exist).</li>
+    <li>A payout processor can be used to automatically execute the payouts every x minutes (if you are using a hot wallet in your store).</li>
+    <li>Cold wallets should also be supported, but you will need to manually sign.</li>
+    <li>Every time an invoice is settled, the calculation of the payout is done again so there should be no discrepancies.</li>
     <li>An overview page exists where you can view the invoices to forward and their status.</li>
-    <li>Before a payout is done, the destination needs to be pre-created and the destination must have a balance. This acts as a safeguard so the wrong destination can never receive too much.</li>
+
+    @* TODO: Update this line *@
+    <li>Before a payout can be created, the destination needs to be pre-created and the destination must have a balance. This acts as a safeguard so the wrong destination can never receive too much.</li>
+
     <li>Only BTC OnChain payments are currently supported.</li>
 </ul>
 
 <h3>Known limitations</h3>
 <ul>
     <li>BTC-OnChain only (no Lightning Network support)</li>
-    <li>Payouts are automatically created, but you should be careful to not have the same destination address in another store, because a duplicate destination error will occur.</li>
+    <li>Payouts are automatically created, but you should be careful to not have the same destination address in another store, because a duplicate destination error will occur. This makes this plugin "single store only", unless you are 100% sure the same destinations will never occur across your stores.</li>
     <li>Auto-forwardable invoices must be created through the Greenfield API. There is no UI to create an auto-forwardable invoice.</li>
 </ul>
 
@@ -54,7 +56,7 @@
         Contains the percentage to auto-forward written as a number between 0 and 1
     </li>
 </ul>
-<p>Creating these invoices is currently only possible using the API.</p>
+<p>Creating these invoices is currently only possible using the API. Do not change these metadata fields using the API as that could upset the plugins functionality.</p>
 
 <h3>
     Destinations
@@ -111,3 +113,46 @@ curl -v --header "Authorization: token c56e3f2eee549b6bd9d3ae7a2210f9c79a639460"
 curl -v -XPUT --header "Authorization: token c56e3f2eee549b6bd9d3ae7a2210f9c79a639460" --data '{payoutsAllowed: true }' --header "Content-Type: application/json" http://127.0.0.1:14142/api/v1/stores/5aYTpeJr8C1MThpMw4NvQwCyes4tBve1zZTMrmHibCbD/autoforward-destinations/e883edab-e51c-4ae8-8720-3d77c489f1ad
 </code>
 </pre>
+
+<h3>Invoice metadata fields</h3>
+<p>These metadata fields are available through the Greenfield API. Only edit them if you know what you're doing.</p>
+<table>
+    <thead>
+    <tr>
+        <th>Field</th>
+        <th>Description</th>
+        <td>Example value</td>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+        <td>autoForwardToAddress</td>
+        <td>The BTC address to forward the payment to. Required for an invoice to be considered as "auto-forwardable". </td>
+        <td>bcrt1q9q26gunpl7e0l45unnqqw9k3dzlsqeqlny3gpv</td>
+    </tr>
+    <tr>
+        <td>autoForwardPercentage</td>
+        <td>The percentage of funds received to forward. Required for an invoice to be considered as "auto-forwardable". Must be > 0 and < 1.</td>
+        <td>0.95</td>
+    </tr>
+    <tr>
+        <td>autoForwardCompleted</td>
+        <td>A boolean that tracks if the payment forwarding is complete or not. Do not set or change this value yourself. The plugin handles this field.</td>
+        <td>&quot;true&quot; or &quot;false&quot; or non-existing also means false</td>
+    </tr>
+    </tbody>
+</table>
+
+<h3>Advanced &amp; Troubleshooting</h3>
+
+<h4>Can I run the processing of invoices and payout creation/updating manually?</h4>
+<p>Yes, just use this button. However, updating happens regularly, so you should not need to press it unless you are testing or experimenting. Updating happens when an invoice changes or when a new block is mined (around once every 10 minutes).</p>
+<p>
+    <a class="btn btn-primary" asp-action="UpdateEverything">
+        <span class="fa fa-refresh"></span>
+        Update Everything
+    </a>
+</p>
+
+<h4>Can I mark an invoice as "auto-forwarding complete" manually?</h4>
+<p>The plugin checks if an invoice is processed using the <em>autoForwardCompleted</em> metadata field. If you give it a value of "true", the plugin will no longer consider this invoice and no more payouts will be created for it. Use the API to change this value. This can upset the reporting however. If you don't want this, you can remove more metadata so the invoice is not even considered "auto-forwardable" anymore.</p>

@@ -23,6 +23,7 @@ public class Plugin : BaseBTCPayServerPlugin
         services.AddSingleton<AutoForwardInvoiceHelper>();
         services.AddSingleton<AutoForwardDestinationRepository>();
         services.AddHostedService<InvoiceWatcher>();
+        services.AddHostedService<BlockWatcher>();
         services.AddDbContext<AutoForwardDbContext>((provider, o) =>
         {
             AutoForwardDbContextFactory factory = provider.GetRequiredService<AutoForwardDbContextFactory>();

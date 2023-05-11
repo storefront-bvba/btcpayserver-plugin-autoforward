@@ -1,24 +1,24 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using BTCPayServer.Events;
 using BTCPayServer.HostedServices;
 using BTCPayServer.Logging;
-using BTCPayServer.Services.Invoices;
 using Microsoft.Extensions.Logging;
 
 namespace BTCPayServer.Plugins.AutoForward.Services;
 
-public class InvoiceWatcher : EventHostedServiceBase
+public class BlockWatcher : EventHostedServiceBase
 {
     private readonly AutoForwardInvoiceHelper _autoForwardInvoiceHelper;
 
-    public InvoiceWatcher(EventAggregator eventAggregator, AutoForwardInvoiceHelper autoForwardInvoiceHelper, Logs logs)
+    public BlockWatcher(EventAggregator eventAggregator, AutoForwardInvoiceHelper autoForwardInvoiceHelper, Logs logs)
         : base(eventAggregator, logs)
     {
         _autoForwardInvoiceHelper = autoForwardInvoiceHelper;
     }
 
-    public InvoiceWatcher(EventAggregator eventAggregator, ILogger logger) : base(eventAggregator, logger)
+    public BlockWatcher(EventAggregator eventAggregator, ILogger logger) : base(eventAggregator, logger)
     {
     }
 
@@ -27,7 +27,7 @@ public class InvoiceWatcher : EventHostedServiceBase
     protected override void SubscribeToEvents()
     {
         base.SubscribeToEvents();
-        Subscribe<InvoiceEvent>();
+        Subscribe<NewBlockEvent>();
     }
 
     protected override async Task ProcessEvent(object evt, CancellationToken cancellationToken)
@@ -36,14 +36,12 @@ public class InvoiceWatcher : EventHostedServiceBase
         {
             await _updateLock.WaitAsync(cancellationToken);
 
-            if (evt is InvoiceEvent { EventCode: InvoiceEventCode.Completed } invoiceEvent)
+            if (evt is NewBlockEvent newBlockEvent)
             {
-                InvoiceEntity invoice = invoiceEvent.Invoice;
-                if (_autoForwardInvoiceHelper.IsValidAutoForwardableInvoice(invoice, true))
-                {
-                    _autoForwardInvoiceHelper.WriteToLog("Need to sync payout for invoice " + invoice.Id);
-                    await _autoForwardInvoiceHelper.SyncPayoutForInvoice(invoice, cancellationToken);
-                }
+                // Wait a bit to make sure other invoice/payout processing is finished.
+                await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                
+                await _autoForwardInvoiceHelper.UpdateEverything(cancellationToken);
             }
         }
         catch (System.Exception e)
