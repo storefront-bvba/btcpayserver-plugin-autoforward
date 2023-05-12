@@ -179,11 +179,11 @@ public class AutoForwardInvoiceHelper
 
             if (isDestinationAllowed)
             {
-                await WriteToLog($"Forward to destination {newMeta.AutoForwardToAddress} is allowed.", invoice.Id);
+                await WriteToLog($"Destination {newMeta.AutoForwardToAddress} is allowed.", invoice.Id);
             }
             else
             {
-                await WriteToLog($"Forward to destination {newMeta.AutoForwardToAddress} is blocked.", invoice.Id);
+                await WriteToLog($"Destination {newMeta.AutoForwardToAddress} is blocked.", invoice.Id);
             }
         }
 
@@ -491,10 +491,12 @@ public class AutoForwardInvoiceHelper
 
             return true;
         }
+
         return false;
     }
 
-    public async Task UpdatePayoutToDestination(AutoForwardDestination destination, string oldDestination, bool? oldAllowed,
+    public async Task UpdatePayoutToDestination(AutoForwardDestination destination, string oldDestination,
+        bool? oldAllowed,
         CancellationToken cancellationToken = default)
     {
         if (oldDestination != null &&
@@ -528,7 +530,7 @@ public class AutoForwardInvoiceHelper
                     invoice.Id);
             }
         }
-        
+
         var invoices = await GetUnprocessedInvoicesLinkedToDestination(destination.Destination, destination.StoreId);
         foreach (var invoice in invoices)
         {
@@ -536,16 +538,17 @@ public class AutoForwardInvoiceHelper
             {
                 // Allowed has changed
                 var newMeta = GetMetaForInvoice(invoice);
-                
+
                 if (destination.PayoutsAllowed)
                 {
-                    await WriteToLog($"Forward to destination {newMeta.AutoForwardToAddress} is now allowed.", invoice.Id);
+                    await WriteToLog($"Destination {newMeta.AutoForwardToAddress} is now allowed.", invoice.Id);
                 }
                 else
                 {
-                    await WriteToLog($"Forward to destination {newMeta.AutoForwardToAddress} is now blocked.", invoice.Id);
+                    await WriteToLog($"Destination {newMeta.AutoForwardToAddress} is now blocked.", invoice.Id);
                 }
             }
+
             await CheckInvoice(invoice, false, false, cancellationToken);
         }
     }
@@ -565,5 +568,14 @@ public class AutoForwardInvoiceHelper
                 WriteToLog(e);
             }
         }
+    }
+
+    public async Task<PayoutData[]> GetPayoutsToDestination(AutoForwardDestination destination, bool isComplete,
+        CancellationToken cancellationToken)
+    {
+        var client = await GetClient(destination.StoreId);
+        var allPayouts = await client.GetStorePayouts(destination.StoreId, false, cancellationToken);
+
+        return allPayouts.Where(p => (isComplete && p.State == PayoutState.Completed) || (!isComplete && p.State != PayoutState.Completed)).ToArray();
     }
 }

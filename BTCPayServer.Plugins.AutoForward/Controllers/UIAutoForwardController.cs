@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using BTCPayServer.Abstractions.Constants;
 using BTCPayServer.Client;
+using BTCPayServer.Client.Models;
 using BTCPayServer.Data;
 using BTCPayServer.Models;
 using BTCPayServer.Plugins.AutoForward.Data;
@@ -15,6 +16,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using NBitcoin;
+using PayoutData = BTCPayServer.Client.Models.PayoutData;
 
 namespace BTCPayServer.Plugins.AutoForward.Controllers;
 
@@ -25,7 +27,9 @@ public class UIAutoForwardController : Controller
     private readonly AutoForwardInvoiceHelper _helper;
     private readonly AutoForwardDestinationRepository _autoForwardDestinationRepository;
 
-    public UIAutoForwardController( UserManager<ApplicationUser> userManager, AutoForwardDestinationRepository autoForwardDestinationRepository, DisplayFormatter displayFormatter, AutoForwardInvoiceHelper helper)
+    public UIAutoForwardController(UserManager<ApplicationUser> userManager,
+        AutoForwardDestinationRepository autoForwardDestinationRepository, DisplayFormatter displayFormatter,
+        AutoForwardInvoiceHelper helper)
     {
         _userManager = userManager;
         _helper = helper;
@@ -122,16 +126,17 @@ public class UIAutoForwardController : Controller
             var payments = invoice.GetPayments(false);
             var hasRefund = invoice.Refunds.Any(data => !data.PullPaymentData.Archived);
             Client.Models.PayoutData payout = null;
-            
+
             if (meta.AutoForwardPayoutId != null)
             {
                 payout = await _helper.GetPayoutById(meta.AutoForwardPayoutId, invoice.StoreId, cancellationToken);
             }
-            else if(_helper.IsValidAutoForwardableInvoice(invoice, false))
+            else if (_helper.IsValidAutoForwardableInvoice(invoice, false))
             {
-                payout = await _helper.GetPayoutForDestination(cryptoCode, meta.AutoForwardToAddress, invoice.StoreId, cancellationToken);
+                payout = await _helper.GetPayoutForDestination(cryptoCode, meta.AutoForwardToAddress, invoice.StoreId,
+                    cancellationToken);
             }
-            
+
             model.Invoices.Add(new AutoForwardableInvoiceModel()
             {
                 Status = state,
@@ -146,7 +151,8 @@ public class UIAutoForwardController : Controller
                 Payout = payout,
                 AutoForwardPercentage = meta.AutoForwardPercentage,
                 AutoForwardCompleted = meta.AutoForwardCompleted,
-                AutoForwardNotNeeded= invoice.Status == InvoiceStatusLegacy.Expired || invoice.Status == InvoiceStatusLegacy.Invalid,
+                AutoForwardNotNeeded = invoice.Status == InvoiceStatusLegacy.Expired ||
+                                       invoice.Status == InvoiceStatusLegacy.Invalid,
                 AmountReceived = amountReceived,
                 AmountReceivedCryptoCode = "BTC" // TODO make dynamic
             });
@@ -159,15 +165,25 @@ public class UIAutoForwardController : Controller
     [Route("~/plugins/autoforward/payouts")]
     public Task<IActionResult> Payouts()
     {
-        var model = new InvoicesViewModel {  };
+        var model = new InvoicesViewModel { };
         return Task.FromResult<IActionResult>(View(model));
     }
 
     [Route("~/plugins/autoforward/destinations")]
     public async Task<IActionResult> Destinations(CancellationToken cancellationToken)
     {
-        var model = new DestinationsViewModel {  };
-        model.Destinations = await _autoForwardDestinationRepository.FindAll(cancellationToken);
+        var model = new DestinationsViewModel { };
+        var destinations = await _autoForwardDestinationRepository.FindAll(cancellationToken);
+        model.Destinations = new DestinationViewModel[destinations.Length];
+
+        for (int i = 0; i < destinations.Length;i++)
+        {
+            var destination = destinations[i];
+            model.Destinations[i].AutoForwardDestination = destination;
+            model.Destinations[i].CompletedPayouts = await _helper.GetPayoutsToDestination(destination, true, cancellationToken);
+            model.Destinations[i].OpenPayouts = await _helper.GetPayoutsToDestination(destination, false ,cancellationToken);
+        }
+        
         return await Task.FromResult<IActionResult>(View(model));
     }
 
@@ -176,7 +192,7 @@ public class UIAutoForwardController : Controller
     {
         return Task.FromResult<IActionResult>(View());
     }
-    
+
     [Route("~/plugins/autoforward/logs")]
     public Task<IActionResult> Logs()
     {
@@ -187,7 +203,7 @@ public class UIAutoForwardController : Controller
     public async Task<IActionResult> UpdateEverything(CancellationToken cancellationToken)
     {
         await _helper.UpdateEverything(cancellationToken);
-        
+
         // TODO show message on top of page when done
         return RedirectToAction(nameof(Index));
     }
@@ -195,15 +211,13 @@ public class UIAutoForwardController : Controller
 
 public class InvoicesViewModel : BasePagingViewModel
 {
-    
     public List<AutoForwardableInvoiceModel> Invoices { get; set; } = new();
     public override int CurrentPageCount => Invoices.Count;
 }
 
 public class DestinationsViewModel : BasePagingViewModel
 {
-    
-    public AutoForwardDestination[] Destinations { get; set; }
+    public DestinationViewModel[] Destinations { get; set; }
     public override int CurrentPageCount => Destinations.Length;
 }
 
@@ -213,7 +227,7 @@ public class AutoForwardableInvoiceModel
 
     public string OrderId { get; set; }
     public string InvoiceId { get; set; }
-    
+
     public string AutoForwardToAddress { get; set; }
     public decimal AutoForwardPercentage { get; set; }
     public bool AutoForwardCompleted { get; set; }
@@ -223,9 +237,16 @@ public class AutoForwardableInvoiceModel
     public InvoiceState Status { get; set; }
     public decimal Amount { get; set; }
     public string Currency { get; set; }
-    
+
     public bool HasRefund { get; set; }
     public List<PaymentEntity> Payments { get; set; }
     public Money AmountReceived { get; set; }
     public string AmountReceivedCryptoCode { get; set; }
+}
+
+public class DestinationViewModel
+{
+    public AutoForwardDestination AutoForwardDestination;
+    public PayoutData[] OpenPayouts;
+    public PayoutData[] CompletedPayouts;
 }

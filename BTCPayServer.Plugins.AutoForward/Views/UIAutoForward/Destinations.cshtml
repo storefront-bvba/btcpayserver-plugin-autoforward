@@ -23,9 +23,15 @@
     <table id="destinations" class="table table-hover">
         <thead>
         <tr>
+            <th class="text-nowrap">ID</th>
             <th class="text-nowrap">Destination Address</th>
             <th class="text-nowrap">Payouts</th>
             <th class="text-nowrap text-end">Balance</th>
+            <th class="text-nowrap text-end">Open Payouts</th>
+            <th class="text-nowrap text-end">Completed Payouts</th>
+            <th class="text-nowrap text-end">Open Amount</th>
+            <th class="text-nowrap text-end">Completed Amount</th>
+            <th class="text-nowrap text-end">Total Amount</th>
             <th class="text-nowrap">Store ID</th>
             <th class="text-nowrap">Payment Method</th>
         </tr>
@@ -33,17 +39,48 @@
         <tbody>
         @{
             decimal totalBalance = 0;
+            decimal totalOpenAmount = 0;
+            decimal totalCompletedAmount = 0;
+            decimal totalCombinedAmount = 0;
+
+            int totalOpenPayouts = 0;
+            int totalCompletedPayouts = 0;
+
         }
         @foreach (var destination in Model.Destinations)
         {
-            totalBalance += destination.Balance;
+            totalBalance += destination.AutoForwardDestination.Balance;
+            totalOpenPayouts += destination.OpenPayouts.Length;
+            totalCompletedPayouts += destination.CompletedPayouts.Length;
 
-            <tr id="destination_@destination.Id" class="destination-row">
+            decimal openAmount = 0m;
+            decimal completedAmount = 0m;
+            decimal combinedAmount = 0m;
+
+            foreach (var openPayout in destination.OpenPayouts)
+            {
+                openAmount += openPayout.Amount;
+                combinedAmount += openPayout.Amount;
+            }
+            foreach (var completedPayout in destination.CompletedPayouts)
+            {
+                completedAmount += completedPayout.Amount;
+                combinedAmount += completedPayout.Amount;
+            }
+
+            totalOpenAmount += openAmount;
+            totalCompletedAmount += completedAmount;
+            totalCombinedAmount += combinedAmount;
+
+            <tr id="destination_@destination.AutoForwardDestination.Id" class="destination-row">
                 <td class="text-nowrap">
-                    @destination.Destination
+                    @destination.AutoForwardDestination.Id
+                </td>
+                <td class="text-nowrap">
+                    @destination.AutoForwardDestination.Destination
                 </td>
                 <td>
-                    @if (destination.PayoutsAllowed)
+                    @if (destination.AutoForwardDestination.PayoutsAllowed)
                     {
                         <span class="badge bg-success">Allowed</span>
                     }
@@ -53,13 +90,28 @@
                     }
                 </td>
                 <td class="text-end text-nowrap">
-                    @DisplayFormatter.Currency(destination.Balance, "BTC")
+                    @DisplayFormatter.Currency(destination.AutoForwardDestination.Balance, "BTC")
+                </td>
+                <td>
+                    @destination.OpenPayouts.Length
+                </td>
+                <td>
+                    @destination.CompletedPayouts.Length
+                </td>
+                <td class="text-end text-nowrap">
+                    @DisplayFormatter.Currency(openAmount, "BTC")
+                </td>
+                <td class="text-end text-nowrap">
+                    @DisplayFormatter.Currency(completedAmount, "BTC")
+                </td>
+                <td class="text-end text-nowrap">
+                    @DisplayFormatter.Currency(combinedAmount, "BTC")
                 </td>
                 <td class="text-nowrap">
-                    @destination.StoreId
+                    @destination.AutoForwardDestination.StoreId
                 </td>
                 <td class="text-nowrap">
-                    @destination.PaymentMethod
+                    @destination.AutoForwardDestination.PaymentMethod
                 </td>
             </tr>
         }
@@ -73,6 +125,24 @@
             </th>
             <th></th>
             <th></th>
+            <th class="text-end text-nowrap">
+                @totalOpenPayouts
+            </th>
+            <th class="text-end text-nowrap">
+                @totalCompletedPayouts
+            </th>
+            <th class="text-end text-nowrap">
+                @DisplayFormatter.Currency(totalOpenAmount, "BTC")
+            </th>
+            <th class="text-end text-nowrap">
+                @DisplayFormatter.Currency(totalCompletedAmount, "BTC")
+            </th>
+            <th class="text-end text-nowrap">
+                @DisplayFormatter.Currency(totalCombinedAmount, "BTC")
+            </th>
+            <th></th>
+            <th></th>
+
         </tr>
         </tfoot>
     </table>
