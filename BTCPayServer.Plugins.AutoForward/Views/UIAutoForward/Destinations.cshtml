@@ -27,6 +27,7 @@
             <th class="text-nowrap">Destination Address</th>
             <th class="text-nowrap">Payouts</th>
             <th class="text-nowrap text-end">Balance</th>
+            <th class="text-nowrap text-end">Open Invoices</th>
             <th class="text-nowrap text-end">Open Payouts</th>
             <th class="text-nowrap text-end">Completed Payouts</th>
             <th class="text-nowrap text-end">Open Amount</th>
@@ -43,6 +44,7 @@
             decimal totalCompletedAmount = 0;
             decimal totalCombinedAmount = 0;
 
+            int totalOpenInvoices = 0;
             int totalOpenPayouts = 0;
             int totalCompletedPayouts = 0;
 
@@ -52,8 +54,9 @@
             totalBalance += destination.AutoForwardDestination.Balance;
             totalOpenPayouts += destination.OpenPayouts.Length;
             totalCompletedPayouts += destination.CompletedPayouts.Length;
+            totalOpenInvoices += destination.OpenInvoiceCount;
 
-            decimal openAmount = 0m;
+            decimal openAmount = destination.OpenInvoiceAmount;
             decimal completedAmount = 0m;
             decimal combinedAmount = 0m;
 
@@ -92,10 +95,13 @@
                 <td class="text-end text-nowrap">
                     @DisplayFormatter.Currency(destination.AutoForwardDestination.Balance, "BTC")
                 </td>
-                <td>
+                <td class="text-end">
+                    @destination.OpenInvoiceCount
+                </td>
+                <td class="text-end">
                     @destination.OpenPayouts.Length
                 </td>
-                <td>
+                <td class="text-end">
                     @destination.CompletedPayouts.Length
                 </td>
                 <td class="text-end text-nowrap">
@@ -120,11 +126,13 @@
         <tr>
             <th>Total</th>
             <th></th>
+            <th></th>
             <th class="text-end text-nowrap">
                 @DisplayFormatter.Currency(totalBalance, "BTC")
             </th>
-            <th></th>
-            <th></th>
+            <th class="text-end text-nowrap">
+                @totalOpenInvoices
+            </th>
             <th class="text-end text-nowrap">
                 @totalOpenPayouts
             </th>

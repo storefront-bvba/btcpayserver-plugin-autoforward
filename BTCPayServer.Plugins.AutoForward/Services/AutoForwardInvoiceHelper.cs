@@ -44,7 +44,7 @@ public class AutoForwardInvoiceHelper
     }
 
 
-    public static Money GetAmountReceived(InvoiceEntity invoice, string paymentMethod)
+    public Money GetAmountReceived(InvoiceEntity invoice, string paymentMethod)
     {
         Money total = new((long)0);
 
@@ -132,7 +132,7 @@ public class AutoForwardInvoiceHelper
             new List<CreateOnChainTransactionRequest.CreateOnChainTransactionRequestDestination>();
         createOnChainTransactionRequest.Destinations.Add(destination);
 
-        // TODO approvind payouts is a manual process for now
+        // TODO approving payouts is a manual process for now
         //bool isApproved = IsDestinationApproved(destinationAddress, amount, paymentMethod, storeId);
         bool isApproved = false;
 
@@ -507,11 +507,14 @@ public class AutoForwardInvoiceHelper
             // 1. Cancel the payout to the old destination. If something goes wrong, it can be re-created easily.
             var client = await GetClient(destination.StoreId);
             string cryptoCode = destination.PaymentMethod.Split()[0];
-            var payoutsToOldDestination = await GetPayoutForDestination(cryptoCode, destination.Destination,
+            var payoutToOldDestination = await GetPayoutForDestination(cryptoCode, destination.Destination,
                 destination.StoreId,
                 cancellationToken);
 
-            await client.CancelPayout(destination.StoreId, payoutsToOldDestination.Id);
+            if (payoutToOldDestination != null)
+            {
+                await client.CancelPayout(destination.StoreId, payoutToOldDestination.Id);
+            }
 
 
             // 2. Update the destination in the invoices
@@ -576,6 +579,13 @@ public class AutoForwardInvoiceHelper
         var client = await GetClient(destination.StoreId);
         var allPayouts = await client.GetStorePayouts(destination.StoreId, false, cancellationToken);
 
-        return allPayouts.Where(p => (isComplete && p.State == PayoutState.Completed) || (!isComplete && p.State != PayoutState.Completed)).ToArray();
+        return allPayouts.Where(p => p.Destination.Equals(destination.Destination, StringComparison.InvariantCulture) && ((isComplete && p.State == PayoutState.Completed) || (!isComplete && p.State != PayoutState.Completed))).ToArray();
+    }
+
+    public decimal GetAmountToForward(InvoiceEntity invoice, string pm)
+    {
+        var meta = GetMetaForInvoice(invoice);
+        var amountReceived = GetAmountReceived(invoice, pm);
+        return meta.AutoForwardPercentage * amountReceived.ToDecimal(MoneyUnit.BTC);
     }
 }

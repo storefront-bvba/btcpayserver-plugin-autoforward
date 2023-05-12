@@ -68,7 +68,7 @@
             if (invoice.AmountReceived.ToDecimal(MoneyUnit.BTC) > 0)
             {
                 amountReceived = invoice.AmountReceived.ToDecimal(MoneyUnit.BTC);
-                amountToForward = invoice.AutoForwardPercentage * amountReceived;
+                amountToForward = invoice.AmountToForward;
 
                 totalToForward += amountToForward;
                 totalReceived += amountReceived;
