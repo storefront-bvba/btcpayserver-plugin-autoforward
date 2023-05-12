@@ -114,6 +114,15 @@ curl -v -XPUT --header "Authorization: token c56e3f2eee549b6bd9d3ae7a2210f9c79a6
 </code>
 </pre>
 
+<h4>Changing a payout destination</h4>
+<p>If you change the destination, <em>payoutsAllowed</em> will default back to <em>false</em> unless you pass it and set to <em>true</em> specifically. This is to prevent the new destination to be used immediately. Likely you will want the receiver to approve the new destination first.</p>
+<p>Any unprocessed payouts and invoices will automatically update to use the new destination.</p>
+<pre>
+<code>
+curl -v -XPUT --header "Authorization: token c56e3f2eee549b6bd9d3ae7a2210f9c79a639460" --data '{destination: "bcrt1qvr5mcpnw6v2zq9uzh99lar5u57dnwhgv5sasmn" }' --header "Content-Type: application/json" http://127.0.0.1:14142/api/v1/stores/5aYTpeJr8C1MThpMw4NvQwCyes4tBve1zZTMrmHibCbD/autoforward-destinations/e883edab-e51c-4ae8-8720-3d77c489f1ad
+</code>
+</pre>
+
 <h3>Invoice metadata fields</h3>
 <p>These metadata fields are available through the Greenfield API. Only edit them if you know what you're doing.</p>
 <table>
@@ -156,3 +165,6 @@ curl -v -XPUT --header "Authorization: token c56e3f2eee549b6bd9d3ae7a2210f9c79a6
 
 <h4>Can I mark an invoice as "auto-forwarding complete" manually?</h4>
 <p>The plugin checks if an invoice is processed using the <em>autoForwardCompleted</em> metadata field. If you give it a value of "true", the plugin will no longer consider this invoice and no more payouts will be created for it. Use the API to change this value. This can upset the reporting however. If you don't want this, you can remove more metadata so the invoice is not even considered "auto-forwardable" anymore.</p>
+
+<h4>Can I hide an invoice from the list?</h4>
+<p>If you archive an invoice, it will disappear from the list entirely.</p>

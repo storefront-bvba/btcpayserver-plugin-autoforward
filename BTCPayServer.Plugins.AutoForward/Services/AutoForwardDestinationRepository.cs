@@ -43,6 +43,31 @@ public class AutoForwardDestinationRepository
         return data;
     }
 
+    public async Task<AutoForwardDestination> EnsureDestinationExists(string destination, string storeId,
+        string paymentMethod)
+    {
+        var entity = await FindByDestination(destination, storeId, paymentMethod);
+        if (entity == null)
+        {
+            // Create
+            entity = await Create(new AutoForwardDestination()
+                { Destination = destination, StoreId = storeId, PaymentMethod = paymentMethod });
+        }
+
+        return entity;
+    }
+
+    public async Task<AutoForwardDestination> FindByDestination(string destination, string storeId,
+        string paymentMethod,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = _autoForwardDbContextFactory.CreateContext();
+        IQueryable<AutoForwardDestination> query = context.AutoForwardDestination
+            .Where(ca => ca.StoreId == storeId && ca.Destination == destination && ca.PaymentMethod == paymentMethod);
+
+        return (await query.ToListAsync()).FirstOrDefault();
+    }
+
     public async Task<AutoForwardDestination> Create(AutoForwardDestination autoForwardDestination)
     {
         await using var context = _autoForwardDbContextFactory.CreateContext();
@@ -63,19 +88,10 @@ public class AutoForwardDestinationRepository
         return (await query.ToListAsync()).FirstOrDefault();
     }
 
-    public async Task<AutoForwardDestination> UpdatePayoutsAllowed(string storeId, string destinationId, bool allowed)
+    public async Task<AutoForwardDestination> Update(AutoForwardDestination entity)
     {
-        var entity = await FindById(storeId, destinationId);
-        if (entity == null)
-        {
-            throw new RecordNotFoundException();
-        }
-
-        entity.PayoutsAllowed = allowed;
-
         await using var context = _autoForwardDbContextFactory.CreateContext();
         context.AutoForwardDestination.Update(entity);
-
         await context.SaveChangesAsync();
         return entity;
     }

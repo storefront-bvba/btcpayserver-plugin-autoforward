@@ -146,6 +146,7 @@ public class UIAutoForwardController : Controller
                 Payout = payout,
                 AutoForwardPercentage = meta.AutoForwardPercentage,
                 AutoForwardCompleted = meta.AutoForwardCompleted,
+                AutoForwardNotNeeded= invoice.Status == InvoiceStatusLegacy.Expired || invoice.Status == InvoiceStatusLegacy.Invalid,
                 AmountReceived = amountReceived,
                 AmountReceivedCryptoCode = "BTC" // TODO make dynamic
             });
@@ -216,6 +217,7 @@ public class AutoForwardableInvoiceModel
     public string AutoForwardToAddress { get; set; }
     public decimal AutoForwardPercentage { get; set; }
     public bool AutoForwardCompleted { get; set; }
+    public bool AutoForwardNotNeeded { get; set; }
     public Client.Models.PayoutData Payout { get; set; }
 
     public InvoiceState Status { get; set; }

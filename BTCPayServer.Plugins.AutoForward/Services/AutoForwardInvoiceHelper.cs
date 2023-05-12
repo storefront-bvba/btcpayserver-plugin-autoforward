@@ -62,14 +62,14 @@ public class AutoForwardInvoiceHelper
     {
         // TODO this method does not scale and will be very slow if the invoice list is long
         return await GetInvoicesBySql(
-            $"select * FROM \"Invoices\" where \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardToAddress' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPercentage' is not null");
+            $"select * FROM \"Invoices\" where \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardToAddress' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPercentage' is not null and \"Archived\" = 'false'");
     }
 
     public async Task<InvoiceEntity[]> GetAutoForwardableInvoicesNotPaidOut()
     {
         // TODO this method does not scale and will be very slow if the invoice list is long
         return await GetInvoicesBySql(
-            $"select * FROM \"Invoices\" where \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardToAddress' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPercentage' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardCompleted' is null and \"Status\" = 'complete'");
+            $"select * FROM \"Invoices\" where \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardToAddress' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPercentage' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardCompleted' is null and \"Status\" = 'complete' and \"Archived\" = 'false'");
     }
 
     public async Task<InvoiceEntity[]> GetUnprocessedInvoicesLinkedToDestination(string destination, string storeId)
@@ -77,7 +77,7 @@ public class AutoForwardInvoiceHelper
         // TODO this method does not scale and will be very slow if the invoice list is long
         // TODO switch to SQL prepared statements
         string sql =
-            $"select * FROM \"Invoices\" where \"Blob2\"::jsonb -> 'metadata' ->> 'autoForwardToAddress' = '{destination}' and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPercentage' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardCompleted' is null and \"Status\" = 'complete' and \"StoreDataId\" = '{storeId}'";
+            $"select * FROM \"Invoices\" where \"Blob2\"::jsonb -> 'metadata' ->> 'autoForwardToAddress' = '{destination}' and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPercentage' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardCompleted' is null and \"Status\" = 'complete' and \"StoreDataId\" = '{storeId}' and \"Archived\" = 'false'";
         return await GetInvoicesBySql(sql);
     }
 
@@ -93,13 +93,13 @@ public class AutoForwardInvoiceHelper
         return (await query.ToListAsync()).Select(o => _invoiceRepository.ToEntity(o)).ToArray();
     }
 
-    public string[] GetCompletedPayoutIds()
-    {
-        // TODO this method does not scale and will be very slow if the invoice list is long
-        string sql =
-            "select distinct \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPayoutId' as payoutId FROM \"Invoices\" where \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardToAddress' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPercentage' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardCompleted' = 'true'";
-        return null;
-    }
+    // public string[] GetCompletedPayoutIds()
+    // {
+    //     // TODO this method does not scale and will be very slow if the invoice list is long
+    //     string sql =
+    //         "select distinct \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPayoutId' as payoutId FROM \"Invoices\" where \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardToAddress' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardPercentage' is not null and \"Blob2\"::jsonb -> 'metadata' -> 'autoForwardCompleted' = 'true'";
+    //     return null;
+    // }
 
     // public async Task CreatePayoutForAllSettledInvoices(CancellationToken cancellationToken)
     // {
@@ -132,27 +132,66 @@ public class AutoForwardInvoiceHelper
             new List<CreateOnChainTransactionRequest.CreateOnChainTransactionRequestDestination>();
         createOnChainTransactionRequest.Destinations.Add(destination);
 
+        // TODO approvind payouts is a manual process for now
+        //bool isApproved = IsDestinationApproved(destinationAddress, amount, paymentMethod, storeId);
+        bool isApproved = false;
+
         CreatePayoutThroughStoreRequest createPayoutThroughStoreRequest = new()
-            { Amount = amount, Destination = destinationAddress, PaymentMethod = paymentMethod, Approved = true };
+            { Amount = amount, Destination = destinationAddress, PaymentMethod = paymentMethod, Approved = isApproved };
 
         var payout = await client.CreatePayout(storeId, createPayoutThroughStoreRequest, cancellationToken);
         return payout;
     }
 
+    private async Task<bool> IsDestinationAllowed(string destinationAddress, string storeId, string paymentMethod,
+        CancellationToken cancellationToken)
+    {
+        var destination =
+            await _autoForwardDestinationRepository.FindByDestination(destinationAddress, storeId, paymentMethod,
+                cancellationToken);
+        return destination.PayoutsAllowed;
+
+        // TODO check amount/balance allowed to pay out
+    }
+
 
     /**
-     * Make sure get given invoice is given a payout
+     * Make sure get given invoice is handled for the current state it's in.
      */
-    public async Task SyncPayoutForInvoice(InvoiceEntity invoice, CancellationToken cancellationToken)
+    public async Task CheckInvoice(InvoiceEntity invoice, bool justCreated, bool justSettled,
+        CancellationToken cancellationToken)
     {
-        if (!IsValidAutoForwardableInvoice(invoice, true))
+        if (!IsValidAutoForwardableInvoice(invoice, false))
         {
             return;
         }
 
-        var metaJson = invoice.Metadata.ToJObject();
-        AutoForwardInvoiceMetadata newMeta = AutoForwardInvoiceMetadata.FromJObject(metaJson);
+        AutoForwardInvoiceMetadata newMeta = GetMetaForInvoice(invoice);
         var paymentMethod = "BTC-OnChain"; // TODO make dynamic
+
+        await _autoForwardDestinationRepository.EnsureDestinationExists(newMeta.AutoForwardToAddress, invoice.StoreId,
+            paymentMethod);
+
+        if (justCreated)
+        {
+            bool isDestinationAllowed = await IsDestinationAllowed(newMeta.AutoForwardToAddress, invoice.StoreId,
+                paymentMethod, cancellationToken);
+
+            if (isDestinationAllowed)
+            {
+                await WriteToLog($"Forward to destination {newMeta.AutoForwardToAddress} is allowed.", invoice.Id);
+            }
+            else
+            {
+                await WriteToLog($"Forward to destination {newMeta.AutoForwardToAddress} is blocked.", invoice.Id);
+            }
+        }
+
+        if (justSettled)
+        {
+            // Increase the balance for the destination, which should only be done once.
+            await IncreaseBalance(invoice, paymentMethod, cancellationToken);
+        }
 
         if (!String.IsNullOrEmpty(newMeta.AutoForwardPayoutId))
         {
@@ -179,12 +218,38 @@ public class AutoForwardInvoiceHelper
         }
     }
 
-    private async Task HandleCompletedPayout(InvoiceEntity invoice)
+    private async Task IncreaseBalance(InvoiceEntity invoice, string paymentMethod,
+        CancellationToken cancellationToken)
+    {
+        var amountReceived = GetAmountReceived(invoice, paymentMethod).ToDecimal(MoneyUnit.BTC);
+        if (amountReceived > 0)
+        {
+            var cryptoCode = paymentMethod.Split("-")[0];
+            string destination = GetMetaForInvoice(invoice).AutoForwardToAddress;
+            var entity =
+                await _autoForwardDestinationRepository.FindByDestination(destination, invoice.StoreId, paymentMethod,
+                    cancellationToken);
+            decimal oldBalance = entity.Balance;
+            entity.Balance += amountReceived;
+            await _autoForwardDestinationRepository.Update(entity);
+
+            await WriteToLog($"Increased balance for {destination} from {oldBalance} to {entity.Balance} {cryptoCode}",
+                invoice.Id);
+        }
+    }
+
+    private AutoForwardInvoiceMetadata GetMetaForInvoice(InvoiceEntity invoice)
     {
         var metaJson = invoice.Metadata.ToJObject();
         AutoForwardInvoiceMetadata newMeta = AutoForwardInvoiceMetadata.FromJObject(metaJson);
-        newMeta.AutoForwardCompleted = true;
         invoice.Metadata = newMeta;
+        return newMeta;
+    }
+
+    private async Task HandleCompletedPayout(InvoiceEntity invoice)
+    {
+        AutoForwardInvoiceMetadata newMeta = GetMetaForInvoice(invoice);
+        newMeta.AutoForwardCompleted = true;
 
         await _invoiceRepository.UpdateInvoiceMetadata(invoice.Id, invoice.StoreId, newMeta.ToJObject());
         await WriteToLog("Payout completed", invoice.Id);
@@ -238,10 +303,13 @@ public class AutoForwardInvoiceHelper
             }
         }
 
+        bool isDestinationAllowed = await IsDestinationAllowed(destination, storeId, paymentMethod, cancellationToken);
+
         if (payout != null)
         {
             // TODO maybe "subtractFromAmount" is different now, and we should still cancel? Where is this stored in the payout?
-            if (payout.Amount.Equals(totalAmountToForward))
+
+            if (payout.Amount.Equals(totalAmountToForward) && isDestinationAllowed)
             {
                 // The existing payout is correct. No need to change anything.
                 return;
@@ -258,7 +326,7 @@ public class AutoForwardInvoiceHelper
             }
         }
 
-        if (totalAmountToForward > 0)
+        if (totalAmountToForward > 0 && isDestinationAllowed)
         {
             WriteToLog($"Creating payout to {destination} for {totalAmountToForward} {paymentMethod}...");
 
@@ -312,8 +380,7 @@ public class AutoForwardInvoiceHelper
                         invoice.Id);
 
                     // Link the invoice to the payout
-                    var metaJson = invoice.Metadata.ToJObject();
-                    AutoForwardInvoiceMetadata newMeta = AutoForwardInvoiceMetadata.FromJObject(metaJson);
+                    AutoForwardInvoiceMetadata newMeta = GetMetaForInvoice(invoice);
                     newMeta.AutoForwardPayoutId = payout.Id;
 
                     await _invoiceRepository.UpdateInvoiceMetadata(invoice.Id, invoice.StoreId, newMeta.ToJObject());
@@ -405,6 +472,7 @@ public class AutoForwardInvoiceHelper
             {
                 return null;
             }
+
             throw;
         }
     }
@@ -412,33 +480,77 @@ public class AutoForwardInvoiceHelper
 
     public bool IsValidAutoForwardableInvoice(InvoiceEntity invoice, bool mustBeIncomplete)
     {
-        if (invoice.Status == InvoiceStatusLegacy.Complete)
+        AutoForwardInvoiceMetadata newMeta = GetMetaForInvoice(invoice);
+        if (!String.IsNullOrEmpty(newMeta.AutoForwardToAddress) &&
+            newMeta.AutoForwardPercentage is > 0 and < 1)
         {
-            var metaJson = invoice.Metadata.ToJObject();
-            AutoForwardInvoiceMetadata newMeta = AutoForwardInvoiceMetadata.FromJObject(metaJson);
-            if (!String.IsNullOrEmpty(newMeta.AutoForwardToAddress) &&
-                newMeta.AutoForwardPercentage is > 0 and < 1)
+            if (mustBeIncomplete && newMeta.AutoForwardCompleted)
             {
-                if (mustBeIncomplete && newMeta.AutoForwardCompleted)
-                {
-                    return false;
-                }
-
-                return true;
+                return false;
             }
-        }
 
+            return true;
+        }
         return false;
     }
 
-    public async Task UpdatePayoutsToDestination(string cryptoCode, string destination, string storeId)
+    public async Task UpdatePayoutToDestination(AutoForwardDestination destination, string oldDestination, bool? oldAllowed,
+        CancellationToken cancellationToken = default)
     {
-        // TODO create or approve payouts if the destination is allowed
-        // TODO cancel payouts if the destination is not allowed
-        // TODO update invoice logs to explain what happened
+        if (oldDestination != null &&
+            !oldDestination.Equals(destination.Destination, StringComparison.InvariantCulture))
+        {
+            // The payout destination has been altered
+
+            // 1. Cancel the payout to the old destination. If something goes wrong, it can be re-created easily.
+            var client = await GetClient(destination.StoreId);
+            string cryptoCode = destination.PaymentMethod.Split()[0];
+            var payoutsToOldDestination = await GetPayoutForDestination(cryptoCode, destination.Destination,
+                destination.StoreId,
+                cancellationToken);
+
+            await client.CancelPayout(destination.StoreId, payoutsToOldDestination.Id);
+
+
+            // 2. Update the destination in the invoices
+            var invoicesToOldDestination =
+                await GetUnprocessedInvoicesLinkedToDestination(oldDestination, destination.StoreId);
+            foreach (var invoice in invoicesToOldDestination)
+            {
+                await WriteToLog($"Cancelled payout to old destination {oldDestination}",
+                    invoice.Id);
+
+                AutoForwardInvoiceMetadata newMeta = GetMetaForInvoice(invoice);
+                newMeta.AutoForwardToAddress = destination.Destination;
+
+                await _invoiceRepository.UpdateInvoiceMetadata(invoice.Id, invoice.StoreId, newMeta.ToJObject());
+                await WriteToLog($"Changed payout destination from {oldDestination} to {destination.Destination}",
+                    invoice.Id);
+            }
+        }
+        
+        var invoices = await GetUnprocessedInvoicesLinkedToDestination(destination.Destination, destination.StoreId);
+        foreach (var invoice in invoices)
+        {
+            if (oldAllowed != null && oldAllowed != destination.PayoutsAllowed)
+            {
+                // Allowed has changed
+                var newMeta = GetMetaForInvoice(invoice);
+                
+                if (destination.PayoutsAllowed)
+                {
+                    await WriteToLog($"Forward to destination {newMeta.AutoForwardToAddress} is now allowed.", invoice.Id);
+                }
+                else
+                {
+                    await WriteToLog($"Forward to destination {newMeta.AutoForwardToAddress} is now blocked.", invoice.Id);
+                }
+            }
+            await CheckInvoice(invoice, false, false, cancellationToken);
+        }
     }
-    
-    
+
+
     public async Task UpdateEverything(CancellationToken cancellationToken = default)
     {
         var openInvoices = await GetAutoForwardableInvoicesNotPaidOut();
@@ -446,7 +558,7 @@ public class AutoForwardInvoiceHelper
         {
             try
             {
-                await SyncPayoutForInvoice(invoice, cancellationToken);
+                await CheckInvoice(invoice, false, false, cancellationToken);
             }
             catch (System.Exception e)
             {

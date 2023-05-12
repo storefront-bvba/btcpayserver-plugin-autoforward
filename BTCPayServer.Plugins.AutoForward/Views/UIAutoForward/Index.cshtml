@@ -82,7 +82,7 @@
                 }
             }
 
-            <tr id="invoice_@invoice.InvoiceId" class="invoice-row @(invoice.AutoForwardCompleted ? "table-secondary":"")">
+            <tr id="invoice_@invoice.InvoiceId" class="invoice-row @(invoice.AutoForwardCompleted || invoice.AutoForwardNotNeeded ? "table-secondary":"")">
                 <td>@invoice.Date.ToBrowserDate()</td>
                 <td class="text-break">
                     <a asp-controller="UIInvoice" asp-action="Invoice" class="invoice-details-link" asp-route-invoiceId="@invoice.InvoiceId">
