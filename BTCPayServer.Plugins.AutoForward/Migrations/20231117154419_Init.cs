@@ -21,7 +21,7 @@ namespace BTCPayServer.Plugins.AutoForward.Migrations
                 {
                     Id = table.Column<string>(maxLength: 50, nullable: false),
                     StoreId = table.Column<string>(maxLength: 50, nullable: false),
-                    Destination = table.Column<string>(maxLength: 50, nullable: false),
+                    Destination = table.Column<string>(maxLength: 90, nullable: false),
                     PaymentMethod = table.Column<string>(maxLength: 50, nullable: false),
                     // Blob = table.Column<byte[]>(nullable: true)
                     Balance = table.Column<decimal>(nullable: false),
